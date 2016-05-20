@@ -29,12 +29,17 @@ set( MIDAS_REST_URL http://midas3.kitware.com/midas/api/rest )
 set( MIDAS_KEY_DIR ${TubeTK_SOURCE_DIR}/MIDAS_Keys )
 
 find_package( PythonInterp )
-
 if( PYTHON_EXECUTABLE )
   add_test( PrintSelf-BaseObjectDocuments ${PYTHON_EXECUTABLE}
     ${TubeTK_SOURCE_DIR}/CMake/PrintSelfCheck.py
     ${TubeTK_SOURCE_DIR}/Base/ObjectDocuments )
 endif( PYTHON_EXECUTABLE )
+
+find_package( SlicerExecutionModel REQUIRED )
+include( ${SlicerExecutionModel_USE_FILE} )
+
+find_package( ITK REQUIRED )
+include( ${ITK_USE_FILE} )
 
 set( BASE_OBJECT_DOCUMENTS_TESTS
   ${TubeTK_LAUNCHER} $<TARGET_FILE:tubeBaseObjectDocumentsTests> )
@@ -49,22 +54,30 @@ set( tubeBaseObjectDocumentsTests_SRCS
 
 include_directories(
   ${TubeTK_SOURCE_DIR}/Base/Common
+  ${TubeTK_SOURCE_DIR}/Base/Filtering
   ${TubeTK_SOURCE_DIR}/Base/ObjectDocuments )
 
 add_executable( tubeBaseObjectDocumentsHeaderTest
   tubeBaseObjectDocumentsHeaderTest.cxx )
-
 target_link_libraries( tubeBaseObjectDocumentsHeaderTest
-  TubeTKObjectDocuments
   ${ITK_LIBRARIES} )
 
-add_executable( tubeBaseObjectDocumentsTests
-  tubeBaseObjectDocumentsTests.cxx
-  ${tubeBaseObjectDocumentsTests_SRCS} )
+set( no_install_option )
+if( NOT TubeTK_INSTALL_DEVELOPMENT )
+  set( no_install_option NO_INSTALL )
+endif()
 
-target_link_libraries( tubeBaseObjectDocumentsTests
-  TubeTKObjectDocuments
-  ${ITK_LIBRARIES} )
+SEMMacroBuildCLI(
+  NAME tubeBaseObjectDocumentsTests
+  ADDITIONAL_SRCS
+  ${tubeBaseObjectDocumentsTests_SRCS}
+  LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
+  TARGET_LIBRARIES
+    ${ITK_LIBRARIES}
+    TubeCLI TubeTKObjectDocuments
+  EXECUTABLE_ONLY
+  ${no_install_option}
+  )
 
 add_test( NAME tubeBaseObjectDocumentsHeaderTest
   COMMAND ${BASE_OBJECT_DOCUMENTS_HEADER_TEST} )

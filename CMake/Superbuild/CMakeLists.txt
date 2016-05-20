@@ -23,9 +23,6 @@
 
 set( CMAKE_MODULE_PATH ${TubeTK_SOURCE_DIR}/CMake/Superbuild ${CMAKE_MODULE_PATH} )
 
-include( ExternalProject )
-include( TubeTKMacroCheckExternalProjectDependency )
-
 set( base "${CMAKE_BINARY_DIR}" )
 set_property( DIRECTORY PROPERTY EP_BASE ${base} )
 
@@ -35,7 +32,7 @@ else( DEFINED BUILD_SHARED_LIBS )
   set( shared ON ) # use for BUILD_SHARED_LIBS on all subsequent projects
 endif( DEFINED BUILD_SHARED_LIBS )
 set( testing OFF ) # use for BUILD_TESTING on all subsequent projects
-set( build_type "Debug" )
+set( build_type "Release" )
 if( CMAKE_BUILD_TYPE )
   set( build_type "${CMAKE_BUILD_TYPE}" )
 endif( CMAKE_BUILD_TYPE )
@@ -83,90 +80,86 @@ if( APPLE )
     -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET} )
 endif( APPLE )
 
-if( UNIX )
-  if( CMAKE_COMPILER_IS_GNUCXX )
-    include(CheckCCompilerFlag)
-    check_c_compiler_flag(-Wno-unused-local-typedefs
-      HAS_NO_UNUSED_LOCAL_TYPEDEFS)
-    if (HAS_NO_UNUSED_LOCAL_TYPEDEFS)
-      set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs"
-        CACHE STRING "Flags used by all build types." FORCE )
-      set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-local-typedefs"
-        CACHE STRING "Flags used by all build types." FORCE )
-    endif(HAS_NO_UNUSED_LOCAL_TYPEDEFS)
-  endif( CMAKE_COMPILER_IS_GNUCXX )
-  set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-strict-aliasing"
-    CACHE STRING "Flags used by all build types." FORCE )
-  set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-strict-aliasing"
-    CACHE STRING "Flags used by all build types." FORCE )
-  if( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
-    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC"
-         CACHE STRING "Flags used by all build types." FORCE )
-    set( CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC"
-         CACHE STRING "Flags used by all build types." FORCE )
-  endif( CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" )
-endif( UNIX )
+#
+# Add applications and modules build options
+#
+if( TubeTK_BUILD_APPLICATIONS )
+  # Expose the TubeTK_BUILD_* variables to Superbuild
+  file( GLOB_RECURSE TubeTK_modules_files
+    "${TubeTK_SOURCE_DIR}/TubeTKModules.cmake" )
+  foreach( f ${TubeTK_modules_files} )
+    ExternalProject_Message( ${PROJECT_NAME} "Including ${f}" )
+    include( ${f} )
+  endforeach( f ${TubeTK_modules_files} )
+endif( TubeTK_BUILD_APPLICATIONS )
 
 
-set( TubeTK_DEPENDENCIES "ITK" "JsonCpp" "ParameterSerializer"
-  "SlicerExecutionModel" )
+macro(list_conditional_append cond list)
+  if(${cond})
+    list(APPEND ${list} ${ARGN})
+  endif()
+endmacro()
 
-if( TubeTK_USE_VTK )
-  set( TubeTK_DEPENDENCIES ${TubeTK_DEPENDENCIES} "VTK" )
-endif( TubeTK_USE_VTK )
+set( TubeTK_DEPENDENCIES "ITK" "SlicerExecutionModel" )
 
-if( TubeTK_USE_CPPCHECK )
-  set( TubeTK_DEPENDENCIES ${TubeTK_DEPENDENCIES} "Cppcheck" )
-endif( TubeTK_USE_CPPCHECK )
+list_conditional_append( TubeTK_USE_VTK TubeTK_DEPENDENCIES "VTK" )
 
-if( TubeTK_BUILD_IMAGE_VIEWER )
-  set( TubeTK_DEPENDENCIES ${TubeTK_DEPENDENCIES} "ImageViewer" )
-endif( TubeTK_BUILD_IMAGE_VIEWER )
+list_conditional_append( TubeTK_USE_CPPCHECK TubeTK_DEPENDENCIES "Cppcheck" )
 
-if( TubeTK_USE_KWSTYLE )
-  set( TubeTK_DEPENDENCIES ${TubeTK_DEPENDENCIES} "KWStyle" )
-endif( TubeTK_USE_KWSTYLE )
+list_conditional_append( TubeTK_BUILD_IMAGE_VIEWER TubeTK_DEPENDENCIES
+ "ImageViewer" )
 
-if( TubeTK_USE_LIBSVM )
-  set( TubeTK_DEPENDENCIES ${TubeTK_DEPENDENCIES} "LIBSVM" )
-endif( TubeTK_USE_LIBSVM )
+list_conditional_append( TubeTK_USE_KWSTYLE TubeTK_DEPENDENCIES "KWStyle" )
 
-if( TubeTK_USE_CTK )
-  set( TubeTK_DEPENDENCIES ${TubeTK_DEPENDENCIES} "CTK" )
-endif( TubeTK_USE_CTK )
+list_conditional_append( TubeTK_USE_JsonCpp TubeTK_DEPENDENCIES "JsonCpp" )
+
+list_conditional_append( TubeTK_USE_LIBSVM TubeTK_DEPENDENCIES "LIBSVM" )
+
+list_conditional_append( TubeTK_USE_CTK TubeTK_DEPENDENCIES "CTK" )
 
 set( TubeTK_EXTERNAL_PROJECTS_ARGS )
 
-if( TubeTK_USE_BOOST )
-  list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS -DBOOST_ROOT=${BOOST_ROOT} )
-endif( TubeTK_USE_BOOST )
+list_conditional_append( TubeTK_USE_BOOST
+  TubeTK_EXTERNAL_PROJECTS_ARGS
+    -DBOOST_ROOT=${BOOST_ROOT} )
 
-if( TubeTK_BUILD_SLICER_MODULES )
-  list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS -DSlicer_DIR=${Slicer_DIR} )
-endif( TubeTK_BUILD_SLICER_MODULES )
+list_conditional_append( TubeTK_BUILD_USING_SLICER
+  TubeTK_EXTERNAL_PROJECTS_ARGS
+    -DSlicer_DIR=${Slicer_DIR} )
 
-if( TubeTK_USE_QT )
-  list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS
+list_conditional_append( TubeTK_USE_QT
+  TubeTK_EXTERNAL_PROJECTS_ARGS
     -DQT_QMAKE_EXECUTABLE:FILEPATH=${QT_QMAKE_EXECUTABLE}
     -DTubeTK_REQUIRED_QT_VERSION=${TubeTK_REQUIRED_QT_VERSION} )
-endif( TubeTK_USE_QT )
 
+list_conditional_append( TubeTK_USE_PYTHON
+  TubeTK_EXTERNAL_PROJECTS_ARGS
+    -DTubeTK_USE_NUMPY_STACK:BOOL=${TubeTK_USE_NUMPY_STACK}
+    -DTubeTK_USE_PYQTGRAPH:BOOL=${TubeTK_USE_PYQTGRAPH}
+    -DPythonVirtualEnvDir:PATH=${PythonVirtualEnvDir}
+    -DPYTHON_EXECUTABLE:FILEPATH=${PYTHON_EXECUTABLE}
+    -DPYTHON_LIBRARY:FILEPATH=${PYTHON_LIBRARY}
+    -DPYTHON_INCLUDE_DIR:PATH=${PYTHON_INCLUDE_DIR}
+ )
 
-if( TubeTK_USE_PYTHON )
+# Append TubeTK_BUILD_MODULE_DEFAULT is has been specified by the user
+if( DEFINED TubeTK_BUILD_MODULE_DEFAULT )
   list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS
-    -DTubeTK_USE_NOTEBOOKS:BOOL=${TubeTK_USE_NOTEBOOKS}
-    -DTubeTK_USE_NUMPY:BOOL=${TubeTK_USE_NUMPY}
-    -DTubeTK_USE_PYQTGRAPH:BOOL=${TubeTK_USE_PYQTGRAPH} )
-endif( TubeTK_USE_PYTHON )
+    -DTubeTK_BUILD_MODULE_DEFAULT:BOOL=${TubeTK_BUILD_MODULE_DEFAULT} )
+endif()
 
 # Check dependencies.
 set( EXTERNAL_PROJECT_DIR ${TubeTK_SOURCE_DIR}/CMake/Superbuild )
-TubeTKMacroCheckExternalProjectDependency( TubeTK )
+
+ExternalProject_Include_Dependencies(TubeTK
+  DEPENDS_VAR TubeTK_DEPENDENCIES
+  SUPERBUILD_VAR TubeTK_USE_SUPERBUILD )
 
 # Normal build.
 set( proj TubeTK )
 
 ExternalProject_Add( ${proj}
+  ${${proj}_EP_ARGS}
   DEPENDS ${TubeTK_DEPENDENCIES}
   DOWNLOAD_COMMAND ""
   DOWNLOAD_DIR ${TubeTK_SOURCE_DIR}
@@ -174,6 +167,7 @@ ExternalProject_Add( ${proj}
   BINARY_DIR ${CMAKE_BINARY_DIR}/${proj}-build
   INSTALL_DIR ${CMAKE_BINARY_DIR}/${proj}-build
   CMAKE_GENERATOR ${gen}
+  BUILD_AWAYS 1
   CMAKE_ARGS
     -DCMAKE_BUILD_TYPE:STRING=${build_type}
     -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
@@ -188,15 +182,23 @@ ExternalProject_Add( ${proj}
     -DBUILD_SHARED_LIBS:BOOL=${shared}
     -DBUILD_TESTING:BOOL=${BUILD_TESTING}
     -DMAKECOMMAND:STRING=${MAKECOMMAND}
+    -DGIT_EXECUTABLE:FILEPATH=${GIT_EXECUTABLE}
+    -Dgit_protocol:STRING=${git_protocol}
+    -Dgithub_protocol:STRING=${github_protocol}
     -DSITE:STRING=${SITE}
+    -DTubeTK_BUILD_APPLICATIONS:BOOL=${TubeTK_BUILD_APPLICATIONS}
+    -DTubeTK_BUILD_IMAGE_VIEWER:BOOL=${TubeTK_BUILD_IMAGE_VIEWER}
+    -DTubeTK_BUILD_USING_SLICER:BOOL=${TubeTK_BUILD_USING_SLICER}
+    -DTubeTK_BUILD_WITHIN_SLICER:BOOL=${TubeTK_BUILD_WITHIN_SLICER}
     -DTubeTK_CONFIG_BINARY_DIR:PATH=${TubeTK_CONFIG_BINARY_DIR}
     -DTubeTK_EXECUTABLE_DIRS:STRING=${TubeTK_EXECUTABLE_DIRS}
-    -DTubeTK_BUILD_APPLICATIONS=${TubeTK_BUILD_APPLICATIONS}
-    -DTubeTK_BUILD_IMAGE_VIEWER:BOOL=${TubeTK_BUILD_IMAGE_VIEWER}
-    -DTubeTK_BUILD_SLICER_MODULES:BOOL=${TubeTK_BUILD_SLICER_MODULES}
+    -DTubeTK_SUPPORT_2D_IMAGES:BOOL=${TubeTK_SUPPORT_2D_IMAGES}
+    -DTubeTK_USE_GPU_ARRAYFIRE:BOOL=${TubeTK_USE_GPU_ARRAYFIRE}
     -DTubeTK_USE_BOOST:BOOL=${TubeTK_USE_BOOST}
     -DTubeTK_USE_CPPCHECK:BOOL=${TubeTK_USE_CPPCHECK}
     -DTubeTK_USE_CTK:BOOL=${TubeTK_USE_CTK}
+    -DTubeTK_USE_PYTHON_EXAMPLES_AS_TESTS:BOOL=${TubeTK_USE_PYTHON_EXAMPLES_AS_TESTS}
+    -DTubeTK_USE_JsonCpp:BOOL=${TubeTK_USE_JsonCpp}
     -DTubeTK_USE_LIBSVM:BOOL=${TubeTK_USE_LIBSVM}
     -DTubeTK_USE_PYTHON:BOOL=${TubeTK_USE_PYTHON}
     -DTubeTK_USE_KWSTYLE:BOOL=${TubeTK_USE_KWSTYLE}

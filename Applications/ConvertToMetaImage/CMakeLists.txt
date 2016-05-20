@@ -57,7 +57,7 @@ if( TubeTK_USE_QT )
 
   option( HIDE_CONSOLE "Hide the console" OFF )
   if( HIDE_CONSOLE )
-    set( CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /subsystem:windows" )
+    tubetk_append_if_absent(CMAKE_EXE_LINKER_FLAGS "/subsystem:windows")
     link_libraries( ${QT_QTMAIN_LIBRARY} )
   endif( HIDE_CONSOLE )
 
@@ -73,20 +73,16 @@ if( TubeTK_USE_QT )
     ${QT_QTGUI_LIBRARY}
     ${QT_QTDESIGNER_LIBRARY} )
 
-  # Add the install rule
-  install( FILES DESTINATION bin COMPONENT RUNTIME )
-
   # Installation file
-  install(
-    TARGETS ConvertToMetaImage
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    COMPONENT RUNTIME )
+  install( TARGETS
+    ConvertToMetaImage
+    DESTINATION ${TubeTK_INSTALL_BIN_DIR}
+    COMPONENT Runtime )
 
 endif( TubeTK_USE_QT )
 
 add_executable( ConvertToMetaImageCLI ConvertToMetaImageCLI.cxx )
+target_link_libraries(  ConvertToMetaImageCLI TubeTKCommon )
 
 if( BUILD_TESTING )
   add_subdirectory( Testing )

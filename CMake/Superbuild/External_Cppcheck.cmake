@@ -21,25 +21,22 @@
 #
 ##############################################################################
 
-# Make sure this file is included only once.
-get_filename_component( CMAKE_CURRENT_LIST_FILENAME ${CMAKE_CURRENT_LIST_FILE}
-  NAME_WE )
-if( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-  return()
-endif( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-set( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED 1 )
-
 set( proj Cppcheck )
 
 # Sanity checks.
 if( CPPCHECK_EXECUTABLE AND NOT EXISTS ${CPPCHECK_EXECUTABLE} )
-  message( FATAL_ERROR "The CPPCHECK_EXECUTABLE variable is defined, but corresponds to a nonexistent file" )
+  message( FATAL_ERROR
+    "CPPCHECK_EXECUTABLE is defined, but corresponds to a nonexistent file" )
 endif( CPPCHECK_EXECUTABLE AND NOT EXISTS ${CPPCHECK_EXECUTABLE} )
 
 set( ${proj}_DEPENDENCIES "" )
 
 # Include dependent projects, if any.
-TubeTKMacroCheckExternalProjectDependency( ${proj} )
+ExternalProject_Include_Dependencies( ${proj}
+  PROJECT_VAR proj
+  DEPENDS_VAR ${proj}_DEPENDENCIES
+  USE_SYSTEM_VAR USE_SYSTEM_${proj}
+  SUPERBUILD_VAR TubeTK_USE_SUPERBUILD )
 
 if( NOT CPPCHECK_EXECUTABLE AND NOT ${USE_SYSTEM_CPPCHECK} )
   set( ${proj}_SOURCE_DIR ${CMAKE_BINARY_DIR}/${proj} )
@@ -47,11 +44,12 @@ if( NOT CPPCHECK_EXECUTABLE AND NOT ${USE_SYSTEM_CPPCHECK} )
   set( CPPCHECK_EXECUTABLE ${${proj}_DIR}/bin/cppcheck )
 
   ExternalProject_Add( ${proj}
+    ${${proj}_EP_ARGS}
     GIT_REPOSITORY ${${proj}_URL}
     GIT_TAG ${${proj}_HASH_OR_TAG}
     DOWNLOAD_DIR ${${proj}_SOURCE_DIR}
     SOURCE_DIR ${${proj}_SOURCE_DIR}
-    BINARY_DIR ${${proj}_SOURCE_DIR}
+    BINARY_DIR ${${proj}_BINARY_DIR}
     INSTALL_DIR ${${proj}_DIR}
     LOG_DOWNLOAD 1
     LOG_UPDATE 0
@@ -59,11 +57,15 @@ if( NOT CPPCHECK_EXECUTABLE AND NOT ${USE_SYSTEM_CPPCHECK} )
     LOG_BUILD 0
     LOG_TEST 0
     LOG_INSTALL 0
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND HAVE_RULES=no CC=${CMAKE_C_COMPILER} CXX=${CMAKE_CXX_COMPILER} ${CMAKE_MAKE_PROGRAM}
-    INSTALL_COMMAND HAVE_RULES=no PREFIX=${${proj}_DIR} ${CMAKE_MAKE_PROGRAM} install
-    DEPENDS
-      ${${proj}_DEPENDENCIES} )
+    CMAKE_GENERATOR ${gen}
+    CMAKE_ARGS
+      -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
+      -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+      -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
+      -DCMAKE_BUILD_TYPE:STRING=${build_type}
+      -DBUILD_SHARED_LIBS:BOOL=OFF
+      -DCMAKE_INSTALL_PREFIX:PATH=${${proj}_DIR}
+      ${CMAKE_OSX_EXTERNAL_PROJECT_ARGS} )
 
 else( NOT CPPCHECK_EXECUTABLE AND NOT ${USE_SYSTEM_CPPCHECK} )
   if( ${USE_SYSTEM_CPPCHECK} )
@@ -71,7 +73,7 @@ else( NOT CPPCHECK_EXECUTABLE AND NOT ${USE_SYSTEM_CPPCHECK} )
     find_program( CPPCHECK_EXECUTABLE NAMES cppcheck PATHS /usr/local/bin )
   endif( ${USE_SYSTEM_CPPCHECK} )
 
-  TubeTKMacroEmptyExternalProject( ${proj} "${${proj}_DEPENDENCIES}" )
+  ExternalProject_Add_Empty( ${proj} DEPENDS ${${proj}_DEPENDENCIES})
 endif( NOT CPPCHECK_EXECUTABLE AND NOT ${USE_SYSTEM_CPPCHECK} )
 
 list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS -DCPPCHECK_EXECUTABLE:FILEPATH=${CPPCHECK_EXECUTABLE} )

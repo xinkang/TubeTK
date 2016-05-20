@@ -25,8 +25,10 @@ limitations under the License.
 #define __itktubeRidgeSeedFilter_h
 
 #include "itktubeBasisFeatureVectorGenerator.h"
-#include "itktubePDFSegmenter.h"
-#include "itktubeRidgeFeatureVectorGenerator.h"
+#include "itktubePDFSegmenterBase.h"
+#include "itktubePDFSegmenterParzen.h"
+#include "itktubePDFSegmenterSVM.h"
+#include "itktubeRidgeFFTFeatureVectorGenerator.h"
 
 #include <itkImage.h>
 
@@ -51,11 +53,10 @@ public:
   typedef SmartPointer< Self >                       Pointer;
   typedef SmartPointer< const Self >                 ConstPointer;
 
-  itkTypeMacro( RidgeSeedFilter, ImageToImageFilter );
+  itkTypeMacro( RidgeSeedFilter, Object );
 
   itkNewMacro( Self );
 
-  typedef TImage                                  ImageType;
   typedef TImage                                  InputImageType;
   typedef Image< float, TImage::ImageDimension >  OutputImageType;
 
@@ -65,13 +66,15 @@ public:
   itkStaticConstMacro( ImageDimension, unsigned int,
     TImage::ImageDimension );
 
-  typedef RidgeFeatureVectorGenerator< TImage >
+  typedef RidgeFFTFeatureVectorGenerator< InputImageType >
     RidgeFeatureGeneratorType;
 
   typedef typename RidgeFeatureGeneratorType::FeatureValueType
     FeatureValueType;
   typedef typename RidgeFeatureGeneratorType::FeatureVectorType
     FeatureVectorType;
+  typedef typename RidgeFeatureGeneratorType::FeatureImageType
+    FeatureImageType;
 
   typedef typename RidgeFeatureGeneratorType::IndexType
     IndexType;
@@ -82,24 +85,26 @@ public:
   typedef typename RidgeFeatureGeneratorType::ValueListType
     WhitenStdDevsType;
 
-  typedef BasisFeatureVectorGenerator< TImage, LabelMapType >
+  typedef BasisFeatureVectorGenerator< InputImageType, LabelMapType >
     SeedFeatureGeneratorType;
 
   typedef typename SeedFeatureGeneratorType::ObjectIdType ObjectIdType;
   typedef typename SeedFeatureGeneratorType::VectorType   VectorType;
   typedef typename SeedFeatureGeneratorType::MatrixType   MatrixType;
-  typedef typename SeedFeatureGeneratorType::FeatureImageType
-    BasisImageType;
 
-  typedef PDFSegmenter< OutputImageType, 3, LabelMapType >
+  typedef PDFSegmenterBase< InputImageType, LabelMapType >
     PDFSegmenterType;
+  typedef PDFSegmenterParzen< InputImageType, LabelMapType >
+    PDFSegmenterParzenType;
+  typedef PDFSegmenterSVM< InputImageType, LabelMapType >
+    PDFSegmenterSVMType;
   typedef typename  PDFSegmenterType::ProbabilityPixelType
     ProbabilityPixelType;
   typedef typename  PDFSegmenterType::ProbabilityImageType
     ProbabilityImageType;
 
-  void SetInput( typename ImageType::Pointer img );
-  void AddInput( typename ImageType::Pointer img );
+  void SetInput( typename InputImageType::Pointer img );
+  void AddInput( typename InputImageType::Pointer img );
 
   void SetLabelMap( typename LabelMapType::Pointer img );
 
@@ -110,21 +115,18 @@ public:
 
   typename PDFSegmenterType::Pointer GetPDFSegmenter( void );
 
-  // Ridge
-  void   SetIntensityRange( float intensityMin, float intensityMax );
-  void   SetIntensityMin( float intensityMin );
-  float  GetIntensityMin( void ) const;
-  void   SetIntensityMax( float intensityMax );
-  float  GetIntensityMax( void ) const;
-
   void            SetScales( const RidgeScalesType & Scales );
   RidgeScalesType GetScales( void ) const;
 
   // Basis
-  void   SetWhitenMeans( const WhitenMeansType & means );
-  void   SetWhitenStdDevs( const WhitenStdDevsType & stdDevs );
-  const WhitenMeansType &   GetWhitenMeans( void ) const;
-  const WhitenStdDevsType & GetWhitenStdDevs( void ) const;
+  void         SetInputWhitenMeans( const WhitenMeansType & means );
+  void         SetInputWhitenStdDevs( const WhitenStdDevsType & stdDevs );
+  const WhitenMeansType &   GetInputWhitenMeans( void ) const;
+  const WhitenStdDevsType & GetInputWhitenStdDevs( void ) const;
+  void         SetOutputWhitenMeans( const WhitenMeansType & means );
+  void         SetOutputWhitenStdDevs( const WhitenStdDevsType & stdDevs );
+  const WhitenMeansType &   GetOutputWhitenMeans( void ) const;
+  const WhitenStdDevsType & GetOutputWhitenStdDevs( void ) const;
 
   unsigned int GetNumberOfBasis( void ) const;
 
@@ -133,7 +135,7 @@ public:
   MatrixType   GetBasisMatrix( void ) const;
   VectorType   GetBasisValues( void ) const;
 
-  typename BasisImageType::Pointer GetBasisImage( unsigned int num = 0 )
+  typename FeatureImageType::Pointer GetBasisImage( unsigned int num = 0 )
     const;
 
   void   SetBasisValue( unsigned int basisNum, double value );
@@ -143,10 +145,16 @@ public:
 
   // PDFSegmenter
   typename ProbabilityImageType::Pointer
-    GetClassProbabilityForInput( unsigned int objectNum ) const;
+    GetClassProbabilityImage( unsigned int objectNum ) const;
 
   typename ProbabilityImageType::Pointer
-    GetClassProbabilityDifferenceForInput( unsigned int objectNum ) const;
+    GetClassLikelihoodRatioImage( unsigned int objectNum ) const;
+
+  itkSetMacro( UseSVM, bool );
+  itkGetMacro( UseSVM, bool );
+
+  itkSetMacro( SVMTrainingDataStride, unsigned int );
+  itkGetMacro( SVMTrainingDataStride, unsigned int );
 
   // Ridge, Basis, and PDFSegmenter
   itkSetMacro( RidgeId, ObjectIdType );
@@ -161,6 +169,12 @@ public:
 
   itkSetMacro( Skeletonize, bool );
   itkGetMacro( Skeletonize, bool );
+
+  itkSetMacro( UseIntensityOnly, bool );
+  itkGetMacro( UseIntensityOnly, bool );
+
+  itkSetMacro( TrainClassifier, bool );
+  itkGetMacro( TrainClassifier, bool );
 
   // Local
   void   Update();
@@ -185,6 +199,11 @@ private:
   typename RidgeFeatureGeneratorType::Pointer     m_RidgeFeatureGenerator;
   typename SeedFeatureGeneratorType::Pointer      m_SeedFeatureGenerator;
   typename PDFSegmenterType::Pointer              m_PDFSegmenter;
+  typename PDFSegmenterParzenType::Pointer        m_PDFSegmenterParzen;
+  typename PDFSegmenterSVMType::Pointer           m_PDFSegmenterSVM;
+
+  bool           m_UseSVM;
+  unsigned int   m_SVMTrainingDataStride;
 
   ObjectIdType   m_RidgeId;
   ObjectIdType   m_BackgroundId;
@@ -193,6 +212,10 @@ private:
   double         m_SeedTolerance;
 
   bool           m_Skeletonize;
+
+  bool           m_UseIntensityOnly;
+
+  bool           m_TrainClassifier;
 
   typename LabelMapType::Pointer m_LabelMap;
 

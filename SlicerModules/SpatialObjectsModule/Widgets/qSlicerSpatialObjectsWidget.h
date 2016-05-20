@@ -67,18 +67,17 @@ public:
     SpatialObjectsDisplayPropertiesNode() const;
 
 public slots:
-  void setSpatialObjectsNode(vtkMRMLNode *node);
-  void setSpatialObjectsNode(vtkMRMLSpatialObjectsNode *node);
-
-  void setSpatialObjectsDisplayNode(vtkMRMLNode *node);
-  void setSpatialObjectsDisplayNode(vtkMRMLSpatialObjectsDisplayNode *node);
+  void setSpatialObjectsNode(vtkMRMLNode *node, int DisplayNodeIndex = 0);
+  void setSpatialObjectsNode(vtkMRMLSpatialObjectsNode* SpatialObjectsNode, int DisplayNodeIndex = 0);
 
   void setVisibility(bool);
   void setColorByScalar();
   void onColorByScalarChanged(int);
-  void onColorByScalarRangeChanged(double,double);
+  void onColorByScalarValuesChanged(double,double);
   void setColorByCellScalars();
   void setColorBySolid();
+  void setSliceIntersection(int);
+  void setSliceIntersectionThickness(double);
   void clickColorBySolid(bool);
   void onColorBySolidChanged(const QColor&);
   void setColorByCellScalarsColorTable(vtkMRMLNode*);
@@ -96,6 +95,9 @@ protected slots:
   void updateWidgetFromMRML();
 
 protected:
+  void setSpatialObjectsDisplayNode(vtkMRMLNode *node);
+  void setSpatialObjectsDisplayNode(vtkMRMLSpatialObjectsDisplayNode *node);
+
   QScopedPointer<qSlicerSpatialObjectsWidgetPrivate> d_ptr;
 
 private:

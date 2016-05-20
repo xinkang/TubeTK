@@ -44,14 +44,21 @@ class VTK_SLICER_SPATIALOBJECTS_MODULE_LOGIC_EXPORT vtkSlicerSpatialObjectsLogic
 {
 public:
   static vtkSlicerSpatialObjectsLogic *New( void );
-  vtkTypeRevisionMacro(vtkSlicerSpatialObjectsLogic,vtkSlicerModuleLogic);
+  vtkTypeMacro(vtkSlicerSpatialObjectsLogic,vtkSlicerModuleLogic);
   void PrintSelf(ostream& os, vtkIndent indent);
 
   // Description:
+  // Read and update the given spatial object from the new spatial object
+  // stored in the filename. If not storage node exists for the given spatial
+  // object, one will be created.
+  void SetSpatialObject(
+    vtkMRMLSpatialObjectsNode* spatialObject, const char* filename);
+
+  // Description:
   // Create SpatialObjectsNode and
-  // read their polydata from a specified directory.
+  // read their polydata from a specified directory if a filename is specified.
   // Also create the logic object for its display.
-  vtkMRMLSpatialObjectsNode* AddSpatialObject(const char* filename);
+  vtkMRMLSpatialObjectsNode* AddSpatialObject(const char* filename = 0);
 
   // Description:
   // Create SpatialObjectsNode and
@@ -71,6 +78,31 @@ public:
   // Write SpatialObjectsNode's polydata  to a specified file.
   int SaveSpatialObject(const char* filename,
                         vtkMRMLSpatialObjectsNode *spatialObjectsNode);
+
+  // Description:
+  // Utility function to copy a spatial object from a node to another
+  // (implemented since python doesn't wrap itk objects)
+  void CopySpatialObject(
+    vtkMRMLSpatialObjectsNode* from, vtkMRMLSpatialObjectsNode* to);
+
+  // Description:
+  // Given a filename pointing to a spatial object file and a spatial object
+  // node, merge the spatial object read from file in the recipient node.
+  // The updated recipient is returned.
+  // \sa MergeSpatialObject
+  vtkMRMLSpatialObjectsNode* MergeSpatialObjectFromFilename(
+    vtkMRMLSpatialObjectsNode* recipient, const char* filename);
+
+  // Description:
+  // Given two spatial object nodes, add the donor spatial object to the
+  // recipient. The donor stays intact and the updated recipient is returned.
+  // \sa MergeSpatialObjectFromFilename
+  vtkMRMLSpatialObjectsNode* MergeSpatialObject(
+    vtkMRMLSpatialObjectsNode* recipient, vtkMRMLSpatialObjectsNode* donor);
+
+  // Description:
+  // Utility function to add the display nodes to a given spatial object node.
+  void AddDisplayNodes(vtkMRMLSpatialObjectsNode* spatialObjectsNode);
 
   // Description:
   // Register MRML Node classes to Scene.

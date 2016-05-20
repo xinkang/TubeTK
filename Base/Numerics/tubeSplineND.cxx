@@ -517,7 +517,7 @@ SplineND
 
   for( int i=( int )m_Dimension-1; i>=0; i-- )
     {
-    unsigned int k = ( unsigned int )vcl_pow( ( float )4, ( int )i );
+    unsigned int k = ( unsigned int )std::pow( ( float )4, ( int )i );
     itDataWSColumn.GoToBegin();
     itDataWSDest.GoToBegin();
     for( unsigned int j=0; j<k; j++ )
@@ -569,7 +569,7 @@ SplineND
     {
     itDataWSColumn.GoToBegin();
     itDataWSDest.GoToBegin();
-    unsigned int k = ( unsigned int )vcl_pow( ( float )4, ( int )i );
+    unsigned int k = ( unsigned int )std::pow( ( float )4, ( int )i );
     switch( dx( ( int )m_Dimension-i-1 ) )
       {
       default:
@@ -766,7 +766,7 @@ SplineND
 
   for( int i=( int )m_Dimension-1; i>=0; i-- )
     {
-    unsigned int k = ( unsigned int )vcl_pow( ( float )4, ( int )i );
+    unsigned int k = ( unsigned int )std::pow( ( float )4, ( int )i );
 
     itk::ImageRegionIterator<ImageType> itImageWSX( itWSX->Value(),
       itWSX->Value()->GetLargestPossibleRegion() );
@@ -901,7 +901,8 @@ SplineND
 
 bool
 SplineND
-::Extreme( VectorType & extX, double * extVal, unsigned int n, MatrixType & dirs )
+::Extreme( VectorType & extX, double * extVal, unsigned int n,
+  MatrixType & dirs )
 {
   return m_OptimizerND->Extreme( extX, extVal, n, dirs );
 }
@@ -928,7 +929,16 @@ SplineND
 
   VectorType eVals( m_Dimension, 0.0 );
   MatrixType eVects( m_Dimension, m_Dimension );
-  ComputeEigen( m_H, eVects, eVals, false );
+  if( m_OptimizerND->GetSearchForMin() )
+    {
+    ComputeEigen( m_H, eVects, eVals, /* orderByAbs= */false,
+      /* minToMax= */false );
+    }
+  else
+    {
+    ComputeEigen( m_H, eVects, eVals, /* orderByAbs= */false,
+      /* minToMax= */true );
+    }
 
   return m_OptimizerND->Extreme( extX, extVal, m_Dimension, eVects );
 }

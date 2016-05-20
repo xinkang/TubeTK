@@ -58,36 +58,41 @@ template< class T >
 double
 ComputeEuclideanDistanceVector(vnl_vector<T> x, const vnl_vector<T> y);
 
-/** Compute eigenvalues and vectors  */
-template< class T >
-void
-ComputeEigen(vnl_matrix<T> const & mat, vnl_matrix<T> &eVects,
-  vnl_vector<T> &eVals, bool orderByAbs, bool minToMax = true);
-
-/** Perform trilinear diagonalization */
-template< class T >
-void
-ComputeTriDiag(vnl_matrix<T> &mat, vnl_vector<T> &diag, vnl_vector<T> &subD);
-
-/** Perform trilinear diagonalization in 2D */
-template< class T >
-void
-ComputeTriDiag2D(vnl_matrix<T> &mat, vnl_vector<T> &diag, vnl_vector<T> &subD);
-
-/** Perform trilinear diagonalization in 3D */
-template< class T >
-void
-ComputeTriDiag3D(vnl_matrix<T> &mat, vnl_vector<T> &diag, vnl_vector<T> &subD);
-
-/**                                          */
-template< class T >
-void
-ComputeTqli(vnl_vector<T> &diag, vnl_vector<T> &subD, vnl_matrix<T> &mat);
-
 /** Compute the Euclidean distance for two points */
 template< class TPoint >
 double
 ComputeEuclideanDistance(TPoint x, TPoint y);
+
+/** Compute Ridgeness measures */
+template< class T >
+void
+ComputeRidgeness( const vnl_matrix<T> & H,
+  const vnl_vector<T> & D,
+  const vnl_vector<T> & prevTangent,
+  double & ridgeness,
+  double & roundness,
+  double & curvature,
+  double & linearity,
+  vnl_matrix<T> & HEVect, vnl_vector<T> & HEVal );
+
+/** Compute eigenvalues and vectors  */
+template< class T >
+void
+FixMatrixSymmetry( vnl_matrix<T> & mat );
+
+/** Compute eigenvalues and vectors  */
+template< class T >
+void
+ComputeEigenOfMatrixInvertedTimesMatrix(
+  vnl_matrix<T> const & matToInvert, vnl_matrix<T> const & mat,
+  vnl_matrix<T> &eVects, vnl_vector<T> &eVals,
+  bool orderByAbs, bool minToMax = true );
+
+/** Compute eigenvalues and vectors  */
+template< class T >
+void
+ComputeEigen(vnl_matrix<T> const & mat, vnl_matrix<T> &eVects,
+  vnl_vector<T> &eVals, bool orderByAbs = false, bool minToMax = true );
 
 } // End namespace tube
 

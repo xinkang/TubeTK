@@ -21,12 +21,20 @@ limitations under the License.
 
 =========================================================================*/
 
+#include "tubetkConfigure.h"
+
+#include "itktubeMetaClassPDF.h"
 #include "itktubeMetaLDA.h"
 #include "itktubeMetaNJetLDA.h"
-#include "itktubeMetaClassPDF.h"
 #include "itktubeMetaRidgeSeed.h"
-#include "itktubeMetaTubeParams.h"
-#include "itktubePDFSegmenterIO.h"
+#include "itktubeMetaTubeExtractor.h"
+#include "itktubePDFSegmenterParzenIO.h"
+#ifdef TubeTK_USE_LIBSVM
+#  include "itktubeRidgeSeedFilterIO.h"
+#  include "itktubePDFSegmenterSVMIO.h"
+#endif
+#include "itktubeTubeExtractorIO.h"
+#include "itktubeTubeXIO.h"
 
 int main( int tubeNotUsed( argc ), char * tubeNotUsed( argv )[] )
 {

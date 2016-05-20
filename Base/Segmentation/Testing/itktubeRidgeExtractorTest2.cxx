@@ -28,7 +28,7 @@ limitations under the License.
 #include <itkSpatialObjectReader.h>
 
 int itktubeRidgeExtractorTest2( int argc, char * argv[] )
-  {
+{
   if( argc != 3 )
     {
     std::cout
@@ -49,11 +49,10 @@ int itktubeRidgeExtractorTest2( int argc, char * argv[] )
   typedef itk::tube::RidgeExtractor<ImageType> RidgeOpType;
   RidgeOpType::Pointer ridgeOp = RidgeOpType::New();
 
-  ridgeOp->SetDebug( true );
+  //ridgeOp->SetDebug( true );
 
   ridgeOp->SetInputImage( im );
-  ridgeOp->SetStepX( 0.75 );
-  ridgeOp->SetExtent( 2.5 );
+  ridgeOp->SetStepX( 0.5 );
   ridgeOp->SetDynamicScale( true );
 
   typedef itk::SpatialObjectReader<>                   ReaderType;
@@ -61,7 +60,6 @@ int itktubeRidgeExtractorTest2( int argc, char * argv[] )
   typedef itk::GroupSpatialObject<>                    GroupType;
   typedef itk::VesselTubeSpatialObject<>               TubeType;
   typedef TubeType::PointListType                      PointListType;
-  typedef TubeType::PointType                          PointType;
   typedef TubeType::TubePointType                      TubePointType;
 
   ReaderType::Pointer reader = ReaderType::New();
@@ -177,7 +175,7 @@ int itktubeRidgeExtractorTest2( int argc, char * argv[] )
 
 
     RidgeOpType::ContinuousIndexType x1 = x0;
-    if( !ridgeOp->LocalRidge( x1 ) )
+    if( ridgeOp->LocalRidge( x1 ) != RidgeOpType::SUCCESS )
       {
       std::cout << "Local ridge test failed.  No ridge found." << std::endl;
       std::cout << "   Source = " << x0 << std::endl;
@@ -192,7 +190,7 @@ int itktubeRidgeExtractorTest2( int argc, char * argv[] )
       double tf = x0[i]-x1[i];
       diff += tf * tf;
       }
-    diff = vcl_sqrt( diff );
+    diff = std::sqrt( diff );
     if( diff > 2*pnt->GetRadius() && diff > 4 )
       {
       std::cout << "Local ridge test failed.  Local ridge too far."
@@ -254,8 +252,6 @@ int itktubeRidgeExtractorTest2( int argc, char * argv[] )
       continue;
       }
 
-    ridgeOp->SmoothTube( xTube, 5 );
-
     if( !ridgeOp->AddTube( xTube ) )
       {
       std::cout << "Add tube failed" << std::endl;
@@ -287,6 +283,16 @@ int itktubeRidgeExtractorTest2( int argc, char * argv[] )
     ++maskIt;
     }
 
+  std::cout << "Ridge termination code counts:" << std::endl;
+  for( unsigned int code = 0; code < ridgeOp->GetNumberOfFailureCodes();
+    ++code )
+    {
+    std::cout << "   " << ridgeOp->GetFailureCodeName(
+      RidgeOpType::FailureCodeEnum( code ) ) << " : "
+      << ridgeOp->GetFailureCodeCount( RidgeOpType::FailureCodeEnum(
+      code ) ) << std::endl;
+    }
+
   std::cout << "Number of failures = " << failures << std::endl;
   if( failures > 0 )
     {
@@ -294,4 +300,4 @@ int itktubeRidgeExtractorTest2( int argc, char * argv[] )
     }
 
   return EXIT_SUCCESS;
-  }
+}

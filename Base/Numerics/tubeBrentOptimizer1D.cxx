@@ -310,8 +310,6 @@ BrentOptimizer1D
   *extX = x;
   *extVal = maxSign*fx;
 
-  std::cout << "Reached max iterations." << std::endl;
-
   return false;
 }
 

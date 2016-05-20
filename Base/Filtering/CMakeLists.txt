@@ -23,8 +23,9 @@
 
 project( TubeTKFiltering )
 
-find_package( ITK REQUIRED )
-include( ${ITK_USE_FILE} )
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  include_directories( ${ArrayFire_INCLUDE_DIRS} )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
 
 set( TubeTK_Base_Filtering_H_Files
   itktubeAnisotropicCoherenceEnhancingDiffusionImageFilter.h
@@ -32,14 +33,32 @@ set( TubeTK_Base_Filtering_H_Files
   itktubeAnisotropicDiffusionTensorImageFilter.h
   itktubeAnisotropicEdgeEnhancementDiffusionImageFilter.h
   itktubeAnisotropicHybridDiffusionImageFilter.h
+  itktubeComputeTubeFlyThroughImageFilter.h
+  itktubeConvertSpatialGraphToImageFilter.h
+  itktubeCropImageFilter.h
+  itktubeCropTubesFilter.h
+  itktubeCVTImageFilter.h
+  itktubeExtractTubePointsSpatialObjectFilter.h
+  itktubeFFTGaussianDerivativeIFFTFilter.h
+  itktubeGaussianDerivativeFilter.h
+  itktubeGaussianDerivativeImageSource.h
+  itktubeInverseIntensityImageFilter.h
+  itktubeMinimumSpanningTreeVesselConnectivityFilter.h
+  itktubePadImageFilter.h
+  itktubeRegionFromReferenceImageFilter.h
   itktubeSheetnessMeasureImageFilter.h
+  itktubeShrinkWithBlendingImageFilter.h
   itktubeSpatialObjectSource.h
   itktubeSpatialObjectToSpatialObjectFilter.h
   itktubeStructureTensorRecursiveGaussianImageFilter.h
   itktubeSubSampleTubeSpatialObjectFilter.h
   itktubeSubSampleTubeTreeSpatialObjectFilter.h
   itktubeSymmetricEigenVectorAnalysisImageFilter.h
-  itktubeTubeEnhancingDiffusion2DImageFilter.h )
+  itktubeTortuositySpatialObjectFilter.h
+  itktubeTubeEnhancingDiffusion2DImageFilter.h
+  itktubeTubeSpatialObjectToDensityImageFilter.h
+  itktubeTubeSpatialObjectToImageFilter.h
+  tubeImageFilters.h )
 
 set( TubeTK_Base_Filtering_HXX_Files
   itktubeAnisotropicCoherenceEnhancingDiffusionImageFilter.hxx
@@ -47,27 +66,60 @@ set( TubeTK_Base_Filtering_HXX_Files
   itktubeAnisotropicDiffusionTensorImageFilter.hxx
   itktubeAnisotropicEdgeEnhancementDiffusionImageFilter.hxx
   itktubeAnisotropicHybridDiffusionImageFilter.hxx
+  itktubeComputeTubeFlyThroughImageFilter.hxx
+  itktubeConvertSpatialGraphToImageFilter.hxx
+  itktubeCropImageFilter.hxx
+  itktubeCropTubesFilter.hxx
+  itktubeCVTImageFilter.hxx
+  itktubeExtractTubePointsSpatialObjectFilter.hxx
+  itktubeFFTGaussianDerivativeIFFTFilter.hxx
+  itktubeGaussianDerivativeFilter.hxx
+  itktubeGaussianDerivativeImageSource.hxx
+  itktubeInverseIntensityImageFilter.hxx
+  itktubeMinimumSpanningTreeVesselConnectivityFilter.hxx
+  itktubePadImageFilter.hxx
+  itktubeRegionFromReferenceImageFilter.hxx
   itktubeSheetnessMeasureImageFilter.hxx
+  itktubeShrinkWithBlendingImageFilter.hxx
   itktubeSpatialObjectSource.hxx
   itktubeSpatialObjectToSpatialObjectFilter.hxx
   itktubeStructureTensorRecursiveGaussianImageFilter.hxx
   itktubeSubSampleTubeSpatialObjectFilter.hxx
   itktubeSubSampleTubeTreeSpatialObjectFilter.hxx
-  itktubeTubeEnhancingDiffusion2DImageFilter.hxx )
+  itktubeTortuositySpatialObjectFilter.h
+  itktubeTubeEnhancingDiffusion2DImageFilter.hxx
+  itktubeTubeSpatialObjectToDensityImageFilter.hxx
+  itktubeTubeSpatialObjectToImageFilter.hxx
+  tubeImageFilters.hxx )
 
-add_custom_target( TubeTKFiltering SOURCES
-  ${TubeTK_Base_Filtering_H_Files}
-  ${TubeTK_Base_Filtering_HXX_Files} )
+# Add GPU Array Fire based filter source files here
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  list( APPEND TubeTK_Base_Filtering_H_Files
+    itktubeArrayFireGlueUtilities.h
+    itktubeGPUArrayFireGaussianDerivativeFilter.h )
 
-include_directories(
-  ${TubeTK_SOURCE_DIR}/Base/Common
-  ${TubeTK_SOURCE_DIR}/Base/Numerics )
+  list( APPEND TubeTK_Base_Filtering_HXX_Files
+    itktubeGPUArrayFireGaussianDerivativeFilter.hxx )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
 
-if( BUILD_TESTING )
+add_library( ${PROJECT_NAME} INTERFACE )
+target_include_directories( ${PROJECT_NAME} INTERFACE
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
+  )
+target_link_libraries( ${PROJECT_NAME} INTERFACE TubeTKNumerics )
+
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
 
-install( FILES
-  ${TubeTK_Base_Filtering_H_Files}
-  ${TubeTK_Base_Filtering_HXX_Files}
-  DESTINATION include )
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_Filtering_H_Files}
+    ${TubeTK_Base_Filtering_HXX_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
+
+  TubeTKMacroInstallPlugins( ${PROJECT_NAME} )
+endif()
+
+set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS ${PROJECT_NAME} )

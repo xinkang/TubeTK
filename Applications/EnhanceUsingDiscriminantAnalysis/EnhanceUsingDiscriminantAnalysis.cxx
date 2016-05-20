@@ -118,11 +118,6 @@ int DoIt( int argc, char * argv[] )
       }
     }
 
-  if( usePCA )
-    {
-    basisGenerator->SetPerformPCA( true );
-    }
-
   if( loadBasisInfo.size() > 0 )
     {
     timeCollector.Start( "LoadBasis" );
@@ -130,10 +125,21 @@ int DoIt( int argc, char * argv[] )
     itk::tube::MetaLDA basisReader( loadBasisInfo.c_str() );
     basisReader.Read();
 
+    basisGenerator->SetNumberOfPCABasisToUseAsFeatures(
+      basisReader.GetNumberOfPCABasisToUseAsFeatures() );
+    basisGenerator->SetNumberOfLDABasisToUseAsFeatures(
+      basisReader.GetNumberOfLDABasisToUseAsFeatures() );
+
     basisGenerator->SetBasisValues( basisReader.GetLDAValues() );
     basisGenerator->SetBasisMatrix( basisReader.GetLDAMatrix() );
-    basisGenerator->SetWhitenMeans( basisReader.GetWhitenMeans() );
-    basisGenerator->SetWhitenStdDevs( basisReader.GetWhitenStdDevs() );
+    basisGenerator->SetInputWhitenMeans( basisReader.
+      GetInputWhitenMeans() );
+    basisGenerator->SetInputWhitenStdDevs( basisReader.
+      GetInputWhitenStdDevs() );
+    basisGenerator->SetOutputWhitenMeans( basisReader.
+      GetOutputWhitenMeans() );
+    basisGenerator->SetOutputWhitenStdDevs( basisReader.
+      GetOutputWhitenStdDevs() );
 
     timeCollector.Stop( "LoadBasis" );
     }
@@ -141,7 +147,20 @@ int DoIt( int argc, char * argv[] )
     {
     timeCollector.Start( "Update" );
 
-    basisGenerator->GenerateBasis();
+    basisGenerator->SetNumberOfPCABasisToUseAsFeatures( useNumberOfPCABasis );
+    if( useNumberOfLDABasis == -1 )
+      {
+      basisGenerator->SetNumberOfLDABasisToUseAsFeatures(
+        objectId.size() - 1 );
+      }
+    else
+      {
+      basisGenerator->SetNumberOfLDABasisToUseAsFeatures(
+        useNumberOfLDABasis );
+      }
+
+    basisGenerator->SetUpdateWhitenStatisticsOnUpdate( true );
+    basisGenerator->Update();
 
     timeCollector.Stop( "Update" );
     }
@@ -150,14 +169,7 @@ int DoIt( int argc, char * argv[] )
     {
     timeCollector.Start( "SaveBasisImages" );
 
-    unsigned int numBasis = basisGenerator->GetNumberOfBasis();
-    if( useNumberOfBasis>0 && useNumberOfBasis < (int)numBasis )
-      {
-      numBasis = useNumberOfBasis;
-      }
-    basisGenerator->SetNumberOfBasisToUseAsFeatures( numBasis );
-
-    std::cout << "Num basis = " << numBasis << std::endl;
+    unsigned int numBasis = basisGenerator->GetNumberOfFeatures();
     for( unsigned int i = 0; i < numBasis; i++ )
       {
       typename BasisImageWriterType::Pointer basisImageWriter =
@@ -177,10 +189,15 @@ int DoIt( int argc, char * argv[] )
   if( saveBasisInfo.size() > 0 )
     {
     timeCollector.Start( "SaveBasis" );
-    itk::tube::MetaLDA basisWriter( basisGenerator->GetBasisValues(),
+    itk::tube::MetaLDA basisWriter(
+      basisGenerator->GetNumberOfPCABasisToUseAsFeatures(),
+      basisGenerator->GetNumberOfLDABasisToUseAsFeatures(),
+      basisGenerator->GetBasisValues(),
       basisGenerator->GetBasisMatrix(),
-      basisGenerator->GetWhitenMeans(),
-      basisGenerator->GetWhitenStdDevs() );
+      basisGenerator->GetInputWhitenMeans(),
+      basisGenerator->GetInputWhitenStdDevs(),
+      basisGenerator->GetOutputWhitenMeans(),
+      basisGenerator->GetOutputWhitenStdDevs() );
     basisWriter.Write( saveBasisInfo.c_str() );
     timeCollector.Stop( "SaveBasis" );
     }

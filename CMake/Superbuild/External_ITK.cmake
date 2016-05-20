@@ -21,25 +21,21 @@
 #
 ##############################################################################
 
-# Make sure this file is included only once.
-get_filename_component( CMAKE_CURRENT_LIST_FILENAME ${CMAKE_CURRENT_LIST_FILE}
-  NAME_WE )
-if( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-  return()
-endif( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-set( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED 1 )
-
 set( proj ITK )
 
 # Sanity checks.
 if( DEFINED ${proj}_DIR AND NOT EXISTS ${${proj}_DIR} )
-  message( FATAL_ERROR "${proj}_DIR variable is defined but corresponds to a nonexistent directory" )
+  message( FATAL_ERROR "${proj}_DIR variable is defined but corresponds to a nonexistent directory (${${proj}_DIR})" )
 endif( DEFINED ${proj}_DIR AND NOT EXISTS ${${proj}_DIR} )
 
 set( ${proj}_DEPENDENCIES "" )
 
 # Include dependent projects, if any.
-TubeTKMacroCheckExternalProjectDependency( ${proj} )
+ExternalProject_Include_Dependencies( ${proj}
+  PROJECT_VAR proj
+  DEPENDS_VAR ${proj}_DEPENDENCIES
+  USE_SYSTEM_VAR USE_SYSTEM_${proj}
+  SUPERBUILD_VAR TubeTK_USE_SUPERBUILD )
 
 if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
   set( ${proj}_SOURCE_DIR ${CMAKE_BINARY_DIR}/${proj} )
@@ -51,7 +47,9 @@ if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
       -DHDF5_ENABLE_USING_MEMCHECKER:BOOL=ON )
   endif( TubeTK_USE_VALGRIND )
 
+
   ExternalProject_Add( ${proj}
+    ${${proj}_EP_ARGS}
     GIT_REPOSITORY ${${proj}_URL}
     GIT_TAG ${${proj}_HASH_OR_TAG}
     DOWNLOAD_DIR ${${proj}_SOURCE_DIR}
@@ -81,6 +79,10 @@ if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
       -DITK_BUILD_DEFAULT_MODULES:BOOL=ON
       -DITK_INSTALL_NO_DEVELOPMENT:BOOL=ON
       -DITK_LEGACY_REMOVE:BOOL=OFF
+      -DITK_LEGACY_SILENT:BOOL=${TubeTK_USE_PYTHON}
+      -DITK_WRAP_PYTHON:BOOL=${TubeTK_USE_PYTHON}
+      -DModule_BridgeNumPy:BOOL=${TubeTK_USE_NUMPY_STACK}
+      -DModule_MinimalPathExtraction:BOOL=ON
       -DKWSYS_USE_MD5:BOOL=ON
       -DModule_ITKReview:BOOL=ON
       ${TubeTK_ITKHDF5_VALGRIND_ARGS}
@@ -91,7 +93,7 @@ else( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
     find_package( ${proj} REQUIRED )
   endif( ${USE_SYSTEM_${proj}} )
 
-  TubeTKMacroEmptyExternalProject( ${proj} "${${proj}_DEPENDENCIES}" )
+  ExternalProject_Add_Empty( ${proj} DEPENDS ${${proj}_DEPENDENCIES} )
 endif( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
 
 list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS -D${proj}_DIR:PATH=${${proj}_DIR} )

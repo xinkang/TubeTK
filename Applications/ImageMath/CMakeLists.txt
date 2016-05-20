@@ -25,21 +25,6 @@
 # following line to configure this CMakeLists.txt file.
 project( ImageMath )
 
-cmake_minimum_required( VERSION 2.8 )
-if( COMMAND CMAKE_POLICY )
-  cmake_policy( SET CMP0003 NEW )
-endif( COMMAND CMAKE_POLICY )
-
-# Disable MSVC 8 warnings
-if( WIN32 )
-  option( DISABLE_MSVC8_DEPRECATED_WARNINGS
-    "Disable Visual Studio 8 deprecated warnings" ON )
-  mark_as_advanced( FORCE DISABLE_MSVC8_DEPRECATED_WARNINGS )
-  if( DISABLE_MSVC8_DEPRECATED_WARNINGS )
-    add_definitions( -D_CRT_SECURE_NO_DEPRECATE )
-  endif( DISABLE_MSVC8_DEPRECATED_WARNINGS )
-endif( WIN32 )
-
 if( NOT TubeTK_SOURCE_DIR )
   find_package( TubeTK REQUIRED )
   include( ${TubeTK_USE_FILE} )
@@ -47,6 +32,9 @@ endif( NOT TubeTK_SOURCE_DIR )
 
 # Find ITK
 find_package( ITK REQUIRED )
+if( TubeTK_BUILD_WITHIN_SLICER )
+  set( ITK_NO_IO_FACTORY_REGISTER_MANAGER 1 ) # See Libs/ITKFactoryRegistration/CMakeLists.txt
+endif( TubeTK_BUILD_WITHIN_SLICER )
 include( ${ITK_USE_FILE} )
 
 # Find SEM
@@ -56,18 +44,11 @@ include( ${SlicerExecutionModel_USE_FILE} )
 SEMMacroBuildCLI(
   NAME ${PROJECT_NAME}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
-  TARGET_LIBRARIES ${ITK_LIBRARIES} TubeTKNumerics
-  INCLUDE_DIRECTORIES
-    ${TubeTK_SOURCE_DIR}/Base/CLI
-    ${TubeTK_SOURCE_DIR}/Base/Common
-    ${TubeTK_SOURCE_DIR}/Base/Numerics
-    ${TubeTK_SOURCE_DIR}/Base/Filtering
-    ${TubeTK_SOURCE_DIR}/Base/Segmentation
-    ${TubeTK_SLICER_SOURCE_DIR}/Modules/CLI/ExpertAutomatedRegistration
-    ${TubeTK_SLICER_SOURCE_DIR}/Modules/CLI/ExpertAutomatedRegistration/ITKRegistrationHelper
-  INSTALL_RUNTIME_DESTINATION lib
-  INSTALL_LIBRARY_DESTINATION lib
-  INSTALL_ARCHIVE_DESTINATION bin )
+  TARGET_LIBRARIES
+    ${ITK_LIBRARIES}
+    ITKIOMeta
+    TubeTKCommon
+    TubeTKSegmentation )
 
 if( BUILD_TESTING )
   add_subdirectory( Testing )

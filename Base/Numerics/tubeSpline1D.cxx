@@ -288,7 +288,8 @@ Spline1D
 {
   if(!m_Defined || (m_Clip && (x<(double)m_XMin || x>(double)m_XMax)))
     {
-    std::cout << "clipping" << std::endl;
+    std::cout << "clipping: " << m_XMin << " <= " << x << " <= " << m_XMax
+      << std::endl;
     return 0;
     }
 
@@ -341,7 +342,7 @@ Spline1D
 
   double xpp = ValueD2(x);
 
-  return xpp/vcl_pow(1.0+xp*xp, 1.5);
+  return xpp/std::pow(1.0+xp*xp, 1.5);
 }
 
 

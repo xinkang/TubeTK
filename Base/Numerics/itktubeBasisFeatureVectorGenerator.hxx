@@ -32,10 +32,11 @@ limitations under the License.
 #include <itkImageFileWriter.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIteratorWithIndex.h>
-#include <itkTimeProbesCollectorBase.h>
 
 #include <iostream>
 #include <limits>
+
+#include <vnl/algo/vnl_cholesky.h>
 
 namespace itk
 {
@@ -47,20 +48,18 @@ template< class TImage, class TLabelMap >
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::BasisFeatureVectorGenerator( void )
 {
-  m_PerformLDA = true;
-  m_PerformPCA = false;
-
   m_LabelMap = NULL;
 
   m_ObjectIdList.clear();
   m_ObjectMeanList.clear();
   m_ObjectCovarianceList.clear();
 
-  m_GlobalMean = 0;
-  m_GlobalCovariance = 0;
+  m_GlobalMean.set_size( 0 );
+  m_GlobalCovariance.set_size( 0, 0 );
 
-  m_NumberOfBasis = 0;
-  m_NumberOfBasisToUseAsFeatures = 0;
+  m_NumberOfPCABasisToUseAsFeatures = 1;
+  m_NumberOfLDABasisToUseAsFeatures = 1;
+
   m_InputFeatureVectorGenerator = NULL;
 
   m_BasisValues.set_size( 0 );
@@ -217,27 +216,19 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
   m_GlobalCovariance = val;
 }
 
-
-template< class TImage, class TLabelMap >
-unsigned int
-BasisFeatureVectorGenerator< TImage, TLabelMap >
-::GetNumberOfBasis( void ) const
-{
-  return m_BasisValues.size();
-}
-
 template< class TImage, class TLabelMap >
 typename BasisFeatureVectorGenerator< TImage, TLabelMap >::VectorType
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::GetBasisVector( unsigned int basisNum ) const
 {
-  if( basisNum < m_BasisValues.size() )
+  if( basisNum < m_InputFeatureVectorGenerator->GetNumberOfFeatures() )
     {
     return m_BasisMatrix.get_column( basisNum );
     }
   else
     {
-    throw;
+    std::cerr << "Basis " << basisNum << " does not exist." << std::endl;
+    return m_BasisMatrix.get_column( 0 );
     }
 }
 
@@ -246,13 +237,14 @@ double
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::GetBasisValue( unsigned int basisNum ) const
 {
-  if( basisNum < m_BasisValues.size() )
+  if( basisNum < m_InputFeatureVectorGenerator->GetNumberOfFeatures() )
     {
     return m_BasisValues[basisNum];
     }
   else
     {
-    throw;
+    std::cerr << "Basis " << basisNum << " does not exist." << std::endl;
+    return m_BasisValues[0];
     }
 }
 
@@ -277,7 +269,7 @@ void
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::SetBasisValue( unsigned int basisNum, double value )
 {
-  if( basisNum < m_BasisValues.size() )
+  if( basisNum < m_InputFeatureVectorGenerator->GetNumberOfFeatures() )
     {
     m_BasisValues[basisNum] = value;
     }
@@ -300,7 +292,7 @@ void
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::SetBasisVector( unsigned int basisNum, const VectorType & vec )
 {
-  if( basisNum < m_BasisValues.size() )
+  if( basisNum < m_InputFeatureVectorGenerator->GetNumberOfFeatures() )
     {
     m_BasisMatrix.set_column( basisNum, vec );
     }
@@ -323,12 +315,8 @@ typename BasisFeatureVectorGenerator< TImage, TLabelMap >::FeatureImageType::Poi
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::GetFeatureImage( unsigned int featureNum ) const
 {
-  if( featureNum < m_NumberOfBasisToUseAsFeatures  )
+  if( featureNum < m_InputFeatureVectorGenerator->GetNumberOfFeatures() )
     {
-    itk::TimeProbesCollectorBase timeCollector;
-
-    timeCollector.Start( "GenerateBasisImage" );
-
     typedef itk::ImageRegionIteratorWithIndex< FeatureImageType >
       ImageIteratorType;
 
@@ -393,26 +381,83 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
         }
       }
 
-    timeCollector.Stop( "GenerateBasisImage" );
-    timeCollector.Report();
-
     return featureImage;
     }
   else
     {
-    throw;
+    throw itk::ExceptionObject( "GetFeatureImage: Feature does not exist" );
     }
 }
 
 template< class TImage, class TLabelMap >
 void
 BasisFeatureVectorGenerator< TImage, TLabelMap >
-::GenerateBasis( void )
+::SetInputWhitenMeans( const ValueListType & means )
 {
-  itk::TimeProbesCollectorBase timeCollector;
+  this->m_InputFeatureVectorGenerator->SetWhitenMeans( means );
+}
 
-  timeCollector.Start( "GenerateStatistics" );
+template< class TImage, class TLabelMap >
+const typename BasisFeatureVectorGenerator< TImage, TLabelMap >::ValueListType &
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::GetInputWhitenMeans( void ) const
+{
+  return this->m_InputFeatureVectorGenerator->GetWhitenMeans();
+}
 
+template< class TImage, class TLabelMap >
+void
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::SetInputWhitenStdDevs( const ValueListType & stdDevs )
+{
+  this->m_InputFeatureVectorGenerator->SetWhitenStdDevs( stdDevs );
+}
+
+template< class TImage, class TLabelMap >
+const typename BasisFeatureVectorGenerator< TImage, TLabelMap >::ValueListType &
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::GetInputWhitenStdDevs( void ) const
+{
+  return this->m_InputFeatureVectorGenerator->GetWhitenStdDevs();
+}
+
+template< class TImage, class TLabelMap >
+void
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::SetOutputWhitenMeans( const ValueListType & means )
+{
+  this->SetWhitenMeans( means );
+}
+
+template< class TImage, class TLabelMap >
+const typename BasisFeatureVectorGenerator< TImage, TLabelMap >::ValueListType &
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::GetOutputWhitenMeans( void ) const
+{
+  return this->GetWhitenMeans();
+}
+
+template< class TImage, class TLabelMap >
+void
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::SetOutputWhitenStdDevs( const ValueListType & stdDevs )
+{
+  this->SetWhitenStdDevs( stdDevs );
+}
+
+template< class TImage, class TLabelMap >
+const typename BasisFeatureVectorGenerator< TImage, TLabelMap >::ValueListType &
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::GetOutputWhitenStdDevs( void ) const
+{
+  return this->GetWhitenStdDevs();
+}
+
+template< class TImage, class TLabelMap >
+void
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::Update( void )
+{
   typedef itk::ImageRegionConstIteratorWithIndex< LabelMapType >
     ConstLabelMapIteratorType;
   ConstLabelMapIteratorType itInMask( m_LabelMap,
@@ -421,6 +466,22 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
   const unsigned int numClasses = this->GetNumberOfObjectIds();
   const unsigned int numInputFeatures =
     m_InputFeatureVectorGenerator->GetNumberOfFeatures();
+
+  if( numClasses == 0 )
+    {
+    std::cerr << "# of classes (object ids) = 0.  Cannot compute basis."
+      << std::endl;
+    return;
+    }
+
+  if( m_NumberOfLDABasisToUseAsFeatures > numClasses - 1 )
+    {
+    std::cerr << "ERROR: Number of LDA basis > ( number of classes - 1 )."
+      << std::endl;
+    std::cerr << "   Reducing number of LDA basis." << std::endl;
+    m_NumberOfLDABasisToUseAsFeatures = numClasses - 1;
+    }
+
   m_ObjectMeanList.resize( numClasses );
   m_ObjectCovarianceList.resize( numClasses );
   std::vector< unsigned int > countList( numClasses );
@@ -441,8 +502,19 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
 
   unsigned int globalCount = 0;
 
-  double delta = 0;
-  double deltaJ = 0;
+  VectorType delta;
+  delta.set_size( numInputFeatures );
+  delta.fill( 0 );
+  VectorListType objectDelta;
+  objectDelta.resize( numClasses );
+  for( unsigned int i=0; i<numClasses; ++i )
+    {
+    objectDelta[i].set_size( numInputFeatures );
+    objectDelta[i].fill( 0 );
+    }
+
+  m_InputFeatureVectorGenerator->Update();
+
   unsigned int valC = 0;
   bool found = false;
   itInMask.GoToBegin();
@@ -471,141 +543,203 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
       FeatureVectorType v = m_InputFeatureVectorGenerator->
         GetFeatureVector( indx );
 
-      ++globalCount;
-      ++countList[valC];
+      // Using method from:
+      // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
       for( unsigned int i = 0; i < numInputFeatures; i++ )
         {
-        delta = v[i] - m_GlobalMean[i];
-        m_GlobalMean[i] += delta / globalCount;
+        delta[i] = ( v[i] - m_GlobalMean[i] ) / ( globalCount + 1 );
+        m_GlobalMean[i] += delta[i];
 
-        delta = v[i] - m_ObjectMeanList[valC][i];
-        m_ObjectMeanList[valC][i] += delta / countList[valC];
+        objectDelta[valC][i] = ( v[i] - m_ObjectMeanList[valC][i] ) /
+          ( countList[valC] + 1 );
+        m_ObjectMeanList[valC][i] += objectDelta[valC][i];
         }
       for( unsigned int i = 0; i < numInputFeatures; i++ )
         {
-        for( unsigned int j = 0; j < numInputFeatures; j++ )
+        for( unsigned int j = i; j < numInputFeatures; j++ )
           {
-          delta = v[i] - m_GlobalMean[i];
-          deltaJ = v[j] - m_GlobalMean[j];
-          m_GlobalCovariance[i][j] += delta * deltaJ;
+          m_GlobalCovariance[i][j] +=
+            globalCount * delta[i] * delta[j]
+            - m_GlobalCovariance[i][j] / ( globalCount + 1 );
+          m_GlobalCovariance[j][i] = m_GlobalCovariance[i][j];
 
-          delta = v[i] - m_ObjectMeanList[valC][i];
-          deltaJ = v[j] - m_ObjectMeanList[valC][j];
-          m_ObjectCovarianceList[valC][i][j] += delta * deltaJ;
+          m_ObjectCovarianceList[valC][i][j] += countList[valC]
+            * objectDelta[valC][i] * objectDelta[valC][j]
+            - m_ObjectCovarianceList[valC][i][j] / ( countList[valC] + 1 );
+          m_ObjectCovarianceList[valC][j][i] =
+            m_ObjectCovarianceList[valC][i][j];
           }
         }
+      ++globalCount;
+      ++countList[valC];
       }
     ++itInMask;
     }
 
   for( unsigned int i = 0; i < numInputFeatures; i++ )
     {
-    for( unsigned int j = 0; j < numInputFeatures; j++ )
+    for( unsigned int j = i; j < numInputFeatures; j++ )
       {
-      m_GlobalCovariance[i][j] /= globalCount - 1;
+      m_GlobalCovariance[i][j] = ( globalCount / ( globalCount - 1 ) )
+        * m_GlobalCovariance[i][j];
+      m_GlobalCovariance[j][i] = m_GlobalCovariance[i][j];
       for( unsigned int c = 0; c < numClasses; c++ )
         {
         if( countList[c] > 1 )
           {
-          m_ObjectCovarianceList[c][i][j] /= countList[c] - 1;
+          m_ObjectCovarianceList[c][i][j] = ( countList[c]
+            / ( countList[c] - 1 ) ) * m_ObjectCovarianceList[c][i][j];
+          m_ObjectCovarianceList[c][j][i] = m_ObjectCovarianceList[c][i][j];
           }
         else
           {
-          m_ObjectCovarianceList[c][i][j] = 1;
+          m_ObjectCovarianceList[c][i][j] = 0;
+          m_ObjectCovarianceList[c][j][i] = 0;
           }
         }
       }
     }
 
-  timeCollector.Stop( "GenerateStatistics" );
-
-  timeCollector.Start( "GenerateBasis" );
-
-  if( m_PerformLDA )
+  if( numInputFeatures < this->GetNumberOfFeatures() )
     {
-    MatrixType covarianceOfMeans( numInputFeatures, numInputFeatures );
+    std::cerr << "ERROR: Number of input features < number of basis."
+      << std::endl;
+    std::cerr << "   Reducing number of PCA basis." << std::endl;
+    int tmpNumFeatures = static_cast<int>( numInputFeatures )
+      - m_NumberOfLDABasisToUseAsFeatures;
+    if( tmpNumFeatures < 0 )
+      {
+      m_NumberOfPCABasisToUseAsFeatures = 0;
+      if( m_NumberOfLDABasisToUseAsFeatures > numInputFeatures )
+        {
+        std::cerr << "   Reducing number of LDA basis." << std::endl;
+        m_NumberOfLDABasisToUseAsFeatures = numInputFeatures - 1;
+        if( m_NumberOfLDABasisToUseAsFeatures <= 0 )
+          {
+          m_NumberOfLDABasisToUseAsFeatures = 1;
+          }
+        }
+      }
+    else
+      {
+      m_NumberOfPCABasisToUseAsFeatures = tmpNumFeatures;
+      }
+    }
+  m_BasisValues.set_size( numInputFeatures );
+  m_BasisMatrix.set_size( numInputFeatures, numInputFeatures );
+
+  VectorType pcaBasisValues;
+  MatrixType pcaBasisMatrix;
+  pcaBasisValues.set_size( numInputFeatures );
+  pcaBasisValues.fill( 0 );
+  pcaBasisMatrix.set_size( numInputFeatures, numInputFeatures );
+  pcaBasisMatrix.fill( 0 );
+
+  int basisNum = 0;
+  if( m_NumberOfLDABasisToUseAsFeatures > 0 )
+    {
+    VectorType meanOfMeans;
+    meanOfMeans.set_size( numInputFeatures );
+    meanOfMeans.fill( 0 );
+
+    MatrixType covarianceOfMeans;
+    covarianceOfMeans.set_size( numInputFeatures, numInputFeatures );
     covarianceOfMeans.fill( 0 );
-    MatrixType meanCovariance( numInputFeatures, numInputFeatures );
+    MatrixType meanCovariance;
+    meanCovariance.set_size( numInputFeatures, numInputFeatures );
     meanCovariance.fill( 0 );
     for( unsigned int c = 0; c < numClasses; c++ )
       {
-      for( unsigned int i = 0; i < numInputFeatures; i++ )
-        {
-        for( unsigned int j = 0; j < numInputFeatures; j++ )
-          {
-          covarianceOfMeans[i][j] +=
-            ( m_ObjectMeanList[c][i] - m_GlobalMean[i] )
-            * ( m_ObjectMeanList[c][j] - m_GlobalMean[j] );
-          meanCovariance[i][j] += m_ObjectCovarianceList[c][i][j];
-          }
-        }
+      meanOfMeans += m_ObjectMeanList[c];
       }
-
-    for( unsigned int i = 0; i < numInputFeatures; i++ )
-      {
-      for( unsigned int j = 0; j < numInputFeatures; j++ )
-        {
-        covarianceOfMeans[i][j] /= numClasses;
-        meanCovariance[i][j] /= numClasses;
-        }
-      }
-
-    MatrixType H;
-    H = covarianceOfMeans * vnl_matrix_inverse<double>( meanCovariance );
-
-    // true = re-order by abs(eval) - zeros will be at end
-    ::tube::ComputeEigen<double>( H, m_BasisMatrix, m_BasisValues,
-      true, false );
-    }
-  else if( m_PerformPCA )
-    {
-    // true = re-order by abs(eval) - zeros will be at end
-    ::tube::ComputeEigen<double>( m_GlobalCovariance,
-      m_BasisMatrix, m_BasisValues, true, false );
-    }
-  else
-    {
-    MatrixType covarianceOfMeans( numInputFeatures, numInputFeatures );
-    covarianceOfMeans.fill( 0 );
+    meanOfMeans /= numClasses;
     for( unsigned int c = 0; c < numClasses; c++ )
       {
       for( unsigned int i = 0; i < numInputFeatures; i++ )
         {
-        for( unsigned int j = 0; j < numInputFeatures; j++ )
+        for( unsigned int j = i; j < numInputFeatures; j++ )
           {
+          meanCovariance[i][j] += m_ObjectCovarianceList[c][i][j];
+          meanCovariance[j][i] = meanCovariance[i][j];
+
           covarianceOfMeans[i][j] +=
-            ( m_ObjectMeanList[c][i] - m_GlobalMean[i] )
-            * ( m_ObjectMeanList[c][j] - m_GlobalMean[j] );
+            ( m_ObjectMeanList[c][i] - meanOfMeans[i] )
+            * ( m_ObjectMeanList[c][j] - meanOfMeans[j] );
+          covarianceOfMeans[j][i] = covarianceOfMeans[i][j];
           }
         }
       }
 
-    for( unsigned int i = 0; i < numInputFeatures; i++ )
-      {
-      for( unsigned int j = 0; j < numInputFeatures; j++ )
-        {
-        covarianceOfMeans[i][j] /= numClasses;
-        }
-      }
+    meanCovariance /= numClasses;
+    covarianceOfMeans /= numClasses;
 
-    // true = re-order by abs(eval) - zeros will be at end
-    ::tube::ComputeEigen<double>( covarianceOfMeans, m_BasisMatrix,
-      m_BasisValues, true, false );
+    VectorType ldaBasisValues;
+    MatrixType ldaBasisMatrix;
+    ldaBasisValues.set_size( numInputFeatures );
+    ldaBasisValues.fill( 0 );
+    ldaBasisMatrix.set_size( numInputFeatures, numInputFeatures );
+    ldaBasisMatrix.fill( 0 );
+
+    ::tube::ComputeEigenOfMatrixInvertedTimesMatrix( meanCovariance,
+      covarianceOfMeans, ldaBasisMatrix, ldaBasisValues, false, false );
+
+    VectorType biasVector;
+    MatrixType biasMatrix;
+    biasVector.set_size( numInputFeatures );
+    biasVector.fill( 0 );
+    biasMatrix.set_size( numInputFeatures, numInputFeatures);
+    biasMatrix.fill( 0 );
+    for( unsigned int f = 0; f < m_NumberOfLDABasisToUseAsFeatures; ++f )
+      {
+      m_BasisValues[ basisNum ] = ldaBasisValues[ f ];
+      m_BasisMatrix.set_column( basisNum, ldaBasisMatrix.get_column( f ) );
+      ++basisNum;
+      biasVector = ldaBasisMatrix.get_column( f );
+      biasMatrix += outer_product( biasVector, biasVector );
+      }
+    // Preserve the following line to document a fix that may be
+    //   needed in practice, but initial results indicate it is not
+    //   needed.   Further evaluations are needed on a diversity of
+    //   data.
+    //::tube::FixMatrixSymmetry( biasMatrix );
+
+    ::tube::ComputeEigenOfMatrixInvertedTimesMatrix( biasMatrix,
+      m_GlobalCovariance, pcaBasisMatrix, pcaBasisValues, false, false );
+    }
+  else
+    {
+    ::tube::ComputeEigen<double>( m_GlobalCovariance, pcaBasisMatrix,
+      pcaBasisValues, false, false );
     }
 
-  m_NumberOfBasisToUseAsFeatures = m_BasisValues.size();
+  for( unsigned int f = 0;
+    f < numInputFeatures - m_NumberOfLDABasisToUseAsFeatures; ++f )
+    {
+    m_BasisValues[ basisNum ] = pcaBasisValues[ f ];
+    m_BasisMatrix.set_column( basisNum, pcaBasisMatrix.get_column( f ) );
+    ++basisNum;
+    }
 
-  timeCollector.Stop( "GenerateBasis" );
-
-  timeCollector.Report();
+  if( this->GetUpdateWhitenStatisticsOnUpdate() )
+    {
+    this->UpdateWhitenStatistics();
+    }
 }
 
 template< class TImage, class TLabelMap >
 void
 BasisFeatureVectorGenerator< TImage, TLabelMap >
-::SetNumberOfBasisToUseAsFeatures( unsigned int numBasisUsed )
+::SetNumberOfLDABasisToUseAsFeatures( unsigned int numBasisUsed )
 {
-  m_NumberOfBasisToUseAsFeatures = numBasisUsed;
+  m_NumberOfLDABasisToUseAsFeatures = numBasisUsed;
+}
+
+template< class TImage, class TLabelMap >
+void
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::SetNumberOfPCABasisToUseAsFeatures( unsigned int numBasisUsed )
+{
+  m_NumberOfPCABasisToUseAsFeatures = numBasisUsed;
 }
 
 template< class TImage, class TLabelMap >
@@ -613,7 +747,24 @@ unsigned int
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::GetNumberOfFeatures( void ) const
 {
-  return m_NumberOfBasisToUseAsFeatures;
+  return m_NumberOfPCABasisToUseAsFeatures
+    + m_NumberOfLDABasisToUseAsFeatures;
+}
+
+template< class TImage, class TLabelMap >
+unsigned int
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::GetNumberOfPCABasisToUseAsFeatures( void ) const
+{
+  return m_NumberOfPCABasisToUseAsFeatures;
+}
+
+template< class TImage, class TLabelMap >
+unsigned int
+BasisFeatureVectorGenerator< TImage, TLabelMap >
+::GetNumberOfLDABasisToUseAsFeatures( void ) const
+{
+  return m_NumberOfLDABasisToUseAsFeatures;
 }
 
 template< class TImage, class TLabelMap >
@@ -621,6 +772,9 @@ typename BasisFeatureVectorGenerator< TImage, TLabelMap >::FeatureVectorType
 BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::GetFeatureVector( const IndexType & indx ) const
 {
+  const unsigned int numInputFeatures =
+    m_InputFeatureVectorGenerator->GetNumberOfFeatures();
+
   const unsigned int numFeatures = this->GetNumberOfFeatures();
 
   FeatureVectorType featureVector;
@@ -629,17 +783,21 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
   VectorType vBasis;
   FeatureVectorType vInput;
 
-  for( unsigned int i = 0; i < numFeatures; i++ )
+  for( unsigned int i = 0; i < numFeatures; ++i )
     {
     vBasis = this->GetBasisVector( i );
     vInput = m_InputFeatureVectorGenerator->GetFeatureVector( indx );
     featureVector[i] = 0;
-    for( unsigned int j = 0; j < vBasis.size(); j++ )
+    for( unsigned int j = 0; j < numInputFeatures; j++ )
       {
       featureVector[i] += vBasis[j] * vInput[j];
       }
+    if( this->GetWhitenStdDev( i ) > 0 )
+      {
+      featureVector[i] = ( featureVector[i] - this->GetWhitenMean( i ) )
+        / this->GetWhitenStdDev( i );
+      }
     }
-
   return featureVector;
 }
 
@@ -649,18 +807,36 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::GetFeatureVectorValue( const IndexType & indx,
   unsigned int featureNum ) const
 {
+  const unsigned int numInputFeatures =
+    m_InputFeatureVectorGenerator->GetNumberOfFeatures();
+
   VectorType vBasis;
   FeatureVectorType vInput;
 
-  vBasis = this->GetBasisVector( featureNum );
-  vInput = m_InputFeatureVectorGenerator->GetFeatureVector( indx );
-
-  FeatureValueType featureVector = 0;
-  for( unsigned int j = 0; j < vBasis.size(); j++ )
+  if( featureNum < this->GetNumberOfFeatures() )
     {
-    featureVector += vBasis[j] * vInput[j];
+    vBasis = this->GetBasisVector( featureNum );
+    vInput = m_InputFeatureVectorGenerator->GetFeatureVector( indx );
+
+    FeatureValueType featureValue = 0;
+    for( unsigned int j = 0; j < numInputFeatures; j++ )
+      {
+      featureValue += vBasis[j] * vInput[j];
+      }
+    if( this->GetWhitenStdDev( featureNum ) > 0 )
+      {
+      featureValue = ( featureValue - this->GetWhitenMean( featureNum ) )
+        / this->GetWhitenStdDev( featureNum );
+      }
+    return featureValue;
     }
-  return featureVector;
+  else
+    {
+    std::cerr << "Basis feature " << featureNum << " does not exist."
+      << std::endl;
+    FeatureValueType featureValue = 0;
+    return featureValue;
+    }
 }
 
 template< class TImage, class TLabelMap >
@@ -669,23 +845,6 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
 ::PrintSelf( std::ostream & os, Indent indent ) const
 {
   Superclass::PrintSelf( os, indent );
-
-  if( m_PerformLDA )
-    {
-    os << indent << "PerformLDA = true" << std::endl;
-    }
-  else
-    {
-    os << indent << "PerformLDA = false" << std::endl;
-    }
-  if( m_PerformPCA )
-    {
-    os << indent << "PerformPCA = true" << std::endl;
-    }
-  else
-    {
-    os << indent << "PerformPCA = false" << std::endl;
-    }
 
   if( m_LabelMap )
     {
@@ -705,6 +864,10 @@ BasisFeatureVectorGenerator< TImage, TLabelMap >
   os << indent << "GlobalCovariance = " << m_GlobalCovariance << std::endl;
   os << indent << "BasisMatrix = " << m_BasisMatrix << std::endl;
   os << indent << "BasisValues = " << m_BasisValues << std::endl;
+  os << indent << "NumberOfPCABasisToUseAsFeatures = "
+    << m_NumberOfPCABasisToUseAsFeatures << std::endl;
+  os << indent << "NumberOfLDABasisToUseAsFeatures = "
+    << m_NumberOfLDABasisToUseAsFeatures << std::endl;
 }
 
 } // End namespace tube

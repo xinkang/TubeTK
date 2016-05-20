@@ -21,13 +21,20 @@ limitations under the License.
 
 =========================================================================*/
 
+#include "tubetkConfigure.h"
+
 #include "itktubeMetaLDA.h"
 #include "itktubeMetaNJetLDA.h"
 #include "itktubeMetaClassPDF.h"
 #include "itktubeMetaRidgeSeed.h"
-#include "itktubeMetaTubeParams.h"
-#include "itktubePDFSegmenterIO.h"
-#include "itktubeRidgeSeedFilterIO.h"
+#include "itktubeMetaTubeExtractor.h"
+#include "itktubePDFSegmenterParzenIO.h"
+#ifdef TubeTK_USE_LIBSVM
+#  include "itktubeRidgeSeedFilterIO.h"
+#  include "itktubePDFSegmenterSVMIO.h"
+#endif
+#include "itktubeTubeExtractorIO.h"
+#include "itktubeTubeXIO.h"
 
 int tubeBaseIOPrintTest( int tubeNotUsed( argc ), char * tubeNotUsed( argv )[] )
 {
@@ -47,18 +54,33 @@ int tubeBaseIOPrintTest( int tubeNotUsed( argc ), char * tubeNotUsed( argv )[] )
   std::cout << "-------------metaRidgeSeed" << std::endl;
   metaRidgeSeed.PrintInfo();
 
-  itk::tube::MetaTubeParams metaTubeParams;
-  std::cout << "-------------metaTubeParams" << std::endl;
-  metaTubeParams.PrintInfo();
+  itk::tube::MetaTubeExtractor metaTubeExtractor;
+  std::cout << "-------------metaTubeExtractor" << std::endl;
+  metaTubeExtractor.PrintInfo();
 
   typedef itk::Image< float, 3 > ImageType;
-  itk::tube::PDFSegmenterIO< ImageType, 3, ImageType > pdfSegmenterIO;
-  std::cout << "-------------pdfSegmenterIO" << std::endl;
-  pdfSegmenterIO.PrintInfo();
+  itk::tube::PDFSegmenterParzenIO< ImageType,
+    ImageType > pdfSegmenterParzenIO;
+  std::cout << "-------------pdfSegmenterParzenIO" << std::endl;
+  pdfSegmenterParzenIO.PrintInfo();
+
+#ifdef TubeTK_USE_LIBSVM
+  itk::tube::PDFSegmenterSVMIO< ImageType,
+    ImageType > pdfSegmenterSVMIO;
+  std::cout << "-------------pdfSegmenterSVMIO" << std::endl;
+  pdfSegmenterSVMIO.PrintInfo();
 
   itk::tube::RidgeSeedFilterIO< ImageType, ImageType > ridgeSeedFilterIO;
   std::cout << "-------------ridgeSeedFilterIO" << std::endl;
   ridgeSeedFilterIO.PrintInfo();
+#endif
+
+  itk::tube::TubeExtractorIO< ImageType > tubeExtractorIO;
+  std::cout << "-------------tubeExtractorIO" << std::endl;
+  tubeExtractorIO.PrintInfo();
+
+  itk::tube::TubeXIO< 3 >::Pointer tubeTubeXIO;
+  std::cout << "-------------tubeTubeXIO" << tubeTubeXIO << std::endl;
 
   return EXIT_SUCCESS;
 }

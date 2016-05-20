@@ -27,6 +27,9 @@ limitations under the License.
 #include "tubeMatrixMath.h"
 
 #include <vnl/algo/vnl_symmetric_eigensystem.h>
+#include <vnl/algo/vnl_real_eigensystem.h>
+#include <vnl/algo/vnl_cholesky.h>
+#include <vnl/algo/vnl_matrix_inverse.h>
 
 namespace tube
 {
@@ -110,7 +113,7 @@ ComputeEuclideanDistanceVector(vnl_vector<T> x, const vnl_vector<T> y)
     {
     s += (x(i)-y(i))*(x(i)-y(i));
     }
-  return vcl_sqrt(s);
+  return std::sqrt(s);
 }
 
 /**
@@ -124,97 +127,179 @@ ComputeEuclideanDistance( TPoint x, TPoint y )
     {
     s += (x[i]-y[i])*(x[i]-y[i]);
     }
-  return vcl_sqrt(s);
+  return std::sqrt(s);
 }
 
-/**
- * Compute eigenvalues and vectors  */
 template< class T >
 void
-ComputeEigen( vnl_matrix<T> const & mat,
-  vnl_matrix<T> &eVects, vnl_vector<T> &eVals,
-  bool orderByAbs, bool minToMax )
+ComputeRidgeness( const vnl_matrix<T> & H,
+  const vnl_vector<T> & D,
+  const vnl_vector<T> & prevTangent,
+  double & ridgeness,
+  double & roundness,
+  double & curvature,
+  double & levelness,
+  vnl_matrix<T> & HEVect, vnl_vector<T> & HEVal )
 {
+  unsigned int ImageDimension = D.size();
 
-  int n = mat.rows();
+  vnl_matrix<T> HSym( H );
+  ::tube::FixMatrixSymmetry( HSym );
+  ::tube::ComputeEigen( HSym, HEVect, HEVal, true, false );
 
-  vnl_vector<T> subD(n);
-
-  eVects = mat;
-  eVals.set_size( n );
-  switch(n)
+  vnl_vector<T> Dv = D;
+  if( Dv.magnitude() > 0 )
     {
-    case 1:
-      eVects.set_size(1,1);
-      eVects.fill( 1 );
-      eVals.set_size(1);
-      eVals.fill( mat[0][0] );
-      break;
-    case 2:
-      ComputeTriDiag2D(eVects, eVals, subD);
-      ComputeTqli(eVals, subD, eVects);
-      break;
-    case 3:
-      ComputeTriDiag3D(eVects, eVals, subD);
-      ComputeTqli(eVals, subD, eVects);
-      break;
-    default:
-      vnl_symmetric_eigensystem< T > eigen( mat );
-      eVects = eigen.V;
-      eVals.set_size( eVects.columns() );
-      for( unsigned int d=0; d<eVects.columns(); d++ )
-        {
-        eVals[d] = eigen.get_eigenvalue( d );
-        }
-      break;
-    }
-
-  if(orderByAbs)
-    {
-    for(int i=0; i<n-1; i++)
-      {
-      for(int j=i+1; j<n; j++)
-        {
-        if( ( vnl_math_abs(eVals(j))>vnl_math_abs(eVals(i)) && !minToMax )
-          || ( vnl_math_abs(eVals(j))<vnl_math_abs(eVals(i)) && minToMax ) )
-          {
-          T tf = eVals(j);
-          eVals(j) = eVals(i);
-          eVals(i) = tf;
-          for(int k=0; k<n; k++)
-            {
-            tf = eVects(k,j);
-            eVects(k,j) = eVects(k,i);
-            eVects(k,i) = tf;
-            }
-          }
-        }
-      }
+    Dv.normalize();
     }
   else
     {
-    for(int i=0; i<n-1; i++)
+    Dv = HEVect.get_column( ImageDimension-1 );
+    }
+
+  if( !prevTangent.empty() )
+    {
+    // Check dot product between the previous tangent and every eigenvector
+    // to determine which one corresponds to the tangent direction.
+    // Then reorder the matrix if needed to always have the tangent in the
+    // last column.
+    unsigned int closestV = 0;
+    double closestVDProd = 0;
+    for( unsigned int i=0; i<ImageDimension; i++ )
       {
-      for(int j=i+1; j<n; j++)
+      double dProd = vnl_math_abs( dot_product( prevTangent,
+        HEVect.get_column(i) ) );
+      if( dProd > closestVDProd )
         {
-        if( ( eVals(j)>eVals(i) && !minToMax )
-          || ( eVals(j)<eVals(i) && minToMax ) )
-          {
-          T tf = eVals(j);
-          eVals(j) = eVals(i);
-          eVals(i) = tf;
-          for(int k=0; k<n; k++)
-            {
-            tf = eVects(k,j);
-            eVects(k,j) = eVects(k,i);
-            eVects(k,i) = tf;
-            }
-          }
+        closestV = i;
+        closestVDProd = dProd;
+        }
+      }
+    if( closestV != ImageDimension-1 )
+      {
+      std::cout << "***********Mixing things up: Chosen t=evect#"
+        << closestV << " dotProd = " << closestVDProd << std::endl;
+      double tf = HEVal[closestV];
+      HEVal[closestV] = HEVal[ImageDimension-1];
+      HEVal[ImageDimension-1] = tf;
+      vnl_vector< double > tv;
+      tv = HEVect.get_column( closestV );
+      HEVect.set_column( closestV, HEVect.get_column( ImageDimension-1 ) );
+      HEVect.set_column( ImageDimension-1, tv );
+      }
+    if( dot_product( prevTangent, HEVect.get_column( ImageDimension-1 ) )
+      < 0 )
+      {
+      for( unsigned int i=0; i<ImageDimension-1; ++i )
+        {
+        HEVect.get_column( ImageDimension-1 )[i] = -1 * HEVect.get_column(
+          ImageDimension-1 )[i];
         }
       }
     }
+
+  double sump = 0;
+  double sumv = 0;
+  int ridge = 1;
+  for( unsigned int i=0; i<ImageDimension-1; i++ )
+    {
+    double dProd = dot_product( Dv, HEVect.get_column( i ) );
+    sump += dProd * dProd;
+
+    double tf = HEVal[i];
+    sumv += tf * tf;
+    if( tf >= 0 )
+      {
+      ridge = -1;
+      }
+    }
+  double avgp = sump / ( ImageDimension - 1 );
+  double avgv = sumv / ( ImageDimension - 1 );
+
+  double curv = sumv
+    / ( sumv + HEVal[ ImageDimension - 1 ] * HEVal[ ImageDimension - 1] );
+  ridgeness = ridge * ( 1 - avgp ) * curv;
+
+  // roundness is 1 - || 1 - v2^2 / v1^2  ||
+  // However, since v1^2 can be extremely small, we use the average
+  roundness = 0;
+  if( avgv != 0 )
+    {
+    if( ImageDimension > 2 )
+      {
+      roundness =
+        1 - vnl_math_abs( 1 - ( ( HEVal[ ImageDimension-2 ] *
+          HEVal[ ImageDimension-2] ) / avgv ) );
+      }
+    else
+      {
+      double denom = sumv + ( HEVal[1] * HEVal[1] );
+      if( denom != 0 )
+        {
+        roundness = ridge * (1 - ( HEVal[1] * HEVal[1] ) / denom );
+        }
+      }
+    }
+
+  // curvature is (v1^2 + v2^2) / 2.0
+  curvature = 0;
+  if( avgv != 0 )
+    {
+    if( ImageDimension > 2 )
+      {
+      // Multiplied by 50 assuming the image is from 0 to 1;
+      curvature = ridge * std::sqrt( avgv ) * 50;
+      }
+    else
+      {
+      curvature = ridge * std::sqrt( avgv ) / 4;
+      }
+    }
+
+  // levelness is (v1^2 + v2^2) / (v1^2 + v2^2 + v3^2) = 1 for a flat ridge
+  levelness = 0;
+  double denom =
+     sumv + ( HEVal[ ImageDimension-1 ] * HEVal[ ImageDimension-1] );
+  if( denom != 0 )
+    {
+    levelness = ridge * sumv / denom;
+    }
 }
 
+/**
+ * Compute eigenvalues and vectors from ( W.inv() * B ) */
+template< class T >
+void
+ComputeEigenOfMatrixInvertedTimesMatrix(
+  vnl_matrix<T> const & matToInvert, vnl_matrix<T> const & mat,
+  vnl_matrix<T> &eVects, vnl_vector<T> &eVals,
+  bool orderByAbs, bool minToMax )
+{
+  vnl_matrix<T> l, u, a;
+  l = vnl_cholesky( matToInvert, vnl_cholesky::quiet ).lower_triangle();
+  u = l.transpose();
+  a = vnl_matrix_inverse<double>( l ) * mat
+    * vnl_matrix_inverse<double>( u );
+  ::tube::FixMatrixSymmetry( a );
+  ::tube::ComputeEigen( a, eVects, eVals, orderByAbs, minToMax );
+  eVects = vnl_matrix_inverse<double>( u ) * eVects;
+}
+
+/**
+ * Ensure the matrix is symmetric  */
+template< class T >
+void
+FixMatrixSymmetry( vnl_matrix<T> & mat )
+{
+  for( unsigned int r=0; r<mat.rows(); ++r )
+    {
+    for( unsigned int c=r+1; c<mat.columns(); ++c )
+      {
+      mat( r, c ) = ( mat( r, c ) + mat( c, r ) ) / 2;
+      mat( c, r ) = mat( r, c );
+      }
+    }
+}
 
 /**
  * Perform trilinear diagonalization in 2D */
@@ -387,6 +472,132 @@ ComputeTqli (vnl_vector<T> &diag, vnl_vector<T> &subD, vnl_matrix<T> &mat)
     if(iter == EIGEN_MAX_ITERATIONS)
       {
       throw("NR_tqli - exceeded maximum iterations\n");
+      }
+    }
+}
+
+/**
+ * Compute eigenvalues and vectors  */
+template< class T >
+void
+ComputeEigen( vnl_matrix<T> const & mat,
+  vnl_matrix<T> &eVects, vnl_vector<T> &eVals,
+  bool orderByAbs, bool minToMax )
+{
+
+  unsigned int n = mat.rows();
+
+  vnl_vector<T> subD(n);
+
+  eVects = mat;
+  eVals.set_size( n );
+  bool symmetric = true;
+  for( unsigned int i=0; i<n-1; ++i )
+    {
+    for( unsigned int j=i+1; j<n; ++j )
+      {
+      if( mat( i, j ) != mat( j, i ) )
+        {
+        std::cout << "Non-symmetric matrix passed to eign-solver."
+          << std::endl;
+        std::cout << "   " << mat( i, j ) << " != " << mat( j, i )
+          << std::endl;
+        symmetric = false;
+        i = n - 1;
+        break;
+        }
+      }
+    }
+  if( symmetric )
+    {
+    switch(n)
+      {
+      case 1:
+        eVects.set_size(1,1);
+        eVects.fill( 1 );
+        eVals.set_size(1);
+        eVals.fill( mat[0][0] );
+        break;
+      case 2:
+        ComputeTriDiag2D(eVects, eVals, subD);
+        ComputeTqli(eVals, subD, eVects);
+        break;
+      case 3:
+        ComputeTriDiag3D(eVects, eVals, subD);
+        ComputeTqli(eVals, subD, eVects);
+        break;
+      default:
+        vnl_symmetric_eigensystem< T > eigen( mat );
+        eVects = eigen.V;
+        eVals.set_size( n );
+        for( unsigned int d=0; d<n; d++ )
+          {
+          eVals[d] = eigen.get_eigenvalue( d );
+          }
+        break;
+      }
+    }
+  else
+    {
+    vnl_matrix< double > matD( mat.rows(), mat.columns() );
+    for( unsigned int c=0; c<mat.columns(); c++ )
+      {
+      for( unsigned int r=0; r<mat.rows(); r++ )
+        {
+        matD( r, c ) = mat( r, c );
+        std::cout << mat( r, c ) << " ";
+        }
+      std::cout << std::endl;
+      }
+    vnl_real_eigensystem eigen( matD );
+    for( unsigned int c=0; c<mat.columns(); c++ )
+      {
+      eVals( c ) = eigen.D( c ).real();
+      for( unsigned int r=0; r<mat.rows(); r++ )
+        {
+        eVects( r, c ) = eigen.Vreal(r, c);
+        }
+      }
+    }
+
+  if(orderByAbs)
+    {
+    for(unsigned int i=0; i<n-1; i++)
+      {
+      for(unsigned int j=i+1; j<n; j++)
+        {
+        if( ( vnl_math_abs(eVals(j))>vnl_math_abs(eVals(i)) && !minToMax )
+          || ( vnl_math_abs(eVals(j))<vnl_math_abs(eVals(i)) && minToMax ) )
+          {
+          T tf = eVals(j);
+          eVals(j) = eVals(i);
+          eVals(i) = tf;
+          vnl_vector<T> tv;
+          tv = eVects.get_column( j );
+          eVects.set_column( j, eVects.get_column( i ) );
+          eVects.set_column( i, tv );
+          }
+        }
+      }
+    }
+  else
+    {
+    for(unsigned int i=0; i<n-1; i++)
+      {
+      for(unsigned int j=i+1; j<n; j++)
+        {
+        if( ( eVals(j)>eVals(i) && !minToMax )
+          || ( eVals(j)<eVals(i) && minToMax ) )
+          {
+          T tf = eVals(j);
+          eVals(j) = eVals(i);
+          eVals(i) = tf;
+          vnl_vector<T> tv;
+          tv = eVects.get_column( j );
+          eVects.set_column( j, eVects.get_column( i ) );
+          eVects.set_column( i, tv );
+          }
+        }
       }
     }
 }

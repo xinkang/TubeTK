@@ -29,13 +29,13 @@ limitations under the License.
 #include <itkImageFileWriter.h>
 #include <itkImageFileReader.h>
 #include <itkImageRegionIteratorWithIndex.h>
+#include <itkRescaleIntensityImageFilter.h>
 
 #include <itktubeRidgeExtractor.h>
 
-#include <tubeBrentOptimizer1D.h>
-#include <tubeOptimizerND.h>
+#include <itktubeMetaTubeExtractor.h>
 
-#include <itktubeMetaTubeParams.h>
+#include <algorithm>
 
 // Must include CLP before including tubeCLIHelperFunctions
 #include "ComputeSegmentTubesParametersCLP.h"
@@ -73,9 +73,9 @@ int WriteOutputImage( std::string & fileName, typename ImageT::Pointer
 }
 
 template< int VDimension >
-int WriteOutputData( std::ofstream & fileStream, itk::ContinuousIndex<
-  double, VDimension > & cIndx, double intensity, double ridgeness,
-  double roundness, double curvature, double linearity )
+int WriteOutputData( std::ofstream & fileStream,
+  itk::ContinuousIndex< double, VDimension > & cIndx, double intensity,
+  double ridgeness, double roundness, double curvature, double levelness )
 {
   for( unsigned int i = 0; i < VDimension; ++i )
     {
@@ -85,145 +85,26 @@ int WriteOutputData( std::ofstream & fileStream, itk::ContinuousIndex<
   fileStream << ridgeness << " ";
   fileStream << roundness << " ";
   fileStream << curvature << " ";
-  fileStream << linearity << std::endl;
+  fileStream << levelness << std::endl;
 
   return EXIT_SUCCESS;
 }
 
-typedef vnl_vector< double >  MetricVectorType;
-typedef std::list< MetricVectorType > SampleListType;
+typedef vnl_vector< double >            MetricVectorType;
+typedef std::vector< MetricVectorType > SampleListType;
 
-class MyOptFunc :
-  public tube::UserFunction< vnl_vector< double >, double >
+int sort_column = 0;
+
+// comparison, not case sensitive.
+bool sort_column_compare( const MetricVectorType & first,
+  const MetricVectorType & second)
 {
-private:
-  SampleListType * m_Tube;
-  SampleListType * m_Bkg;
-  double m_Error;
-
-public:
-  MyOptFunc( void )
+  if( first[sort_column] < second[sort_column] )
     {
-    m_Tube = NULL;
-    m_Bkg = NULL;
-    m_Error = 0;
+    return true;
     }
-
-  void SetTubeSampleList( SampleListType * tube )
-    {
-    m_Tube = tube;
-    }
-
-  void SetBkgSampleList( SampleListType * bkg )
-    {
-    m_Bkg = bkg;
-    }
-
-  const double & Value( const vnl_vector< double > & x )
-    {
-    double maxTubeCount = 0.01 * m_Tube->size();
-    int tubeCount = 0;
-    SampleListType::iterator itr = m_Tube->begin();
-    while( itr != m_Tube->end() )
-      {
-      bool fail = false;
-      for( unsigned int f=0; f<5; ++f )
-        {
-        if( (*itr)[f] < x[f] )
-          {
-          fail = true;
-          break;
-          }
-        }
-      if( fail )
-        {
-        ++tubeCount;
-        }
-      ++itr;
-      }
-
-    double maxBkgCount = 0.01 * m_Bkg->size();
-    int bkgCount = 0;
-    SampleListType::iterator itrBkg = m_Bkg->begin();
-    while( itrBkg != m_Bkg->end() )
-      {
-      bool fail = false;
-      for( unsigned int f=0; f<5; ++f )
-        {
-        if( (*itrBkg)[f] > x[f] )
-          {
-          fail = true;
-          break;
-          }
-        }
-      if( fail )
-        {
-        ++bkgCount;
-        }
-      ++itrBkg;
-      }
-
-    m_Error = 0;
-    if( bkgCount > maxBkgCount )
-      {
-      m_Error += ( bkgCount - maxBkgCount ) / maxBkgCount;
-      }
-    if( tubeCount > maxTubeCount )
-      {
-      m_Error += 4 * ( tubeCount - maxTubeCount ) / maxTubeCount;
-      }
-
-    std::cout << x << " = " << m_Error << std::endl;
-
-    return m_Error;
-    }
-};
-
-class MyOptFuncDeriv:
-  public tube::UserFunction< vnl_vector< double >, vnl_vector< double > >
-{
-private:
-  vnl_vector< double > m_XStep;
-  vnl_vector< double > m_Error;
-  MyOptFunc m_Func;
-
-public:
-  MyOptFuncDeriv( void )
-    {
-    m_XStep.set_size( 5 );
-    m_XStep = 0.01;
-    m_Error.set_size( 5 );
-    }
-
-  void SetXStep( const vnl_vector< double > & xStep )
-    {
-    m_XStep = xStep;
-    }
-
-  void SetTubeSampleList( SampleListType * tube )
-    {
-    m_Func.SetTubeSampleList( tube );
-    }
-
-  void SetBkgSampleList( SampleListType * bkg )
-    {
-    m_Func.SetBkgSampleList( bkg );
-    }
-
-  const vnl_vector< double > & Value( const vnl_vector< double > & x )
-    {
-    vnl_vector< double > xx = x;
-    double e0 = m_Func.Value( xx );
-    for( unsigned int f=0; f<5; ++f )
-      {
-      xx[f] += m_XStep[f];
-      m_Error[f] = ( m_Func.Value( xx ) - e0 );
-      xx[f] = x[f];
-      }
-    return m_Error;
-    }
-
-};
+  return false;
+}
 
 // Your code should be within the DoIt function...
 template< class TPixel, unsigned int VDimension >
@@ -240,7 +121,7 @@ int DoIt( int argc, char * argv[] )
     "ComputeSegmentTubesParameters", CLPProcessInformation );
   progressReporter.Start();
 
-  typedef TPixel                                    InputPixelType;
+  typedef float                                     InputPixelType;
   typedef itk::Image< InputPixelType, VDimension >  InputImageType;
   typedef itk::ImageFileReader< InputImageType >    ReaderType;
 
@@ -248,10 +129,14 @@ int DoIt( int argc, char * argv[] )
   typedef itk::Image< MaskPixelType, VDimension >   MaskImageType;
   typedef itk::ImageFileReader< MaskImageType >     MaskReaderType;
 
+  typedef float                                     ScalePixelType;
+  typedef itk::Image< ScalePixelType, VDimension >  ScaleImageType;
+  typedef itk::ImageFileReader< ScaleImageType >    ScaleReaderType;
+
   typedef float                                     OutputPixelType;
   typedef itk::Image< OutputPixelType, VDimension > OutputImageType;
 
-  typedef itk::tube::RidgeExtractor< InputImageType > RidgeFuncType;
+  typedef itk::tube::RidgeExtractor< InputImageType > RidgeExtractorType;
 
   timeCollector.Start("Load data");
 
@@ -268,387 +153,338 @@ int DoIt( int argc, char * argv[] )
     timeCollector.Report();
     return EXIT_FAILURE;
     }
-  typename InputImageType::Pointer inImage = reader->GetOutput();
+  typename InputImageType::Pointer inputImage = reader->GetOutput();
 
-  bool useMask = false;
-  typename MaskImageType::Pointer maskImage = MaskImageType::New();
-  if( !maskImageFileName.empty() )
+  typename MaskReaderType::Pointer maskReader = MaskReaderType::New();
+  maskReader->SetFileName( maskImageFileName.c_str() );
+  try
     {
-    useMask = true;
-
-    typename MaskReaderType::Pointer maskReader = MaskReaderType::New();
-    maskReader->SetFileName( maskImageFileName.c_str() );
-    try
-      {
-      maskReader->Update();
-      }
-    catch( itk::ExceptionObject & err )
-      {
-      tube::ErrorMessage( "Reading mask: Exception caught: "
-                          + std::string(err.GetDescription()) );
-      timeCollector.Report();
-      return EXIT_FAILURE;
-      }
-    maskImage = maskReader->GetOutput();
+    maskReader->Update();
     }
+  catch( itk::ExceptionObject & err )
+    {
+    tube::ErrorMessage( "Reading mask: Exception caught: "
+                        + std::string(err.GetDescription()) );
+    timeCollector.Report();
+    return EXIT_FAILURE;
+    }
+  typename MaskImageType::Pointer maskImage = maskReader->GetOutput();
+
+  typename ScaleReaderType::Pointer scaleReader = ScaleReaderType::New();
+  scaleReader->SetFileName( scaleImageFileName.c_str() );
+  try
+    {
+    scaleReader->Update();
+    }
+  catch( itk::ExceptionObject & err )
+    {
+    tube::ErrorMessage( "Reading scale: Exception caught: "
+                        + std::string(err.GetDescription()) );
+    timeCollector.Report();
+    return EXIT_FAILURE;
+    }
+  typename ScaleImageType::Pointer scaleImage = scaleReader->GetOutput();
 
   timeCollector.Stop("Load data");
   double progress = 0.1;
   progressReporter.Report( progress );
 
-  if( scale < inImage->GetSpacing()[0] * 0.3 )
-    {
-    scale = inImage->GetSpacing()[0] * 0.3;
-    tubeWarningMacro( << "Reseting scale to " << scale );
-    }
-
   timeCollector.Start("Compute ridgeness images");
 
   typename OutputImageType::RegionType region =
-    inImage->GetLargestPossibleRegion();
-  typename OutputImageType::SpacingType spacing =
-    inImage->GetSpacing();
-  if( supersample != 1 )
-    {
-    typename OutputImageType::RegionType::SizeType size = region.GetSize();
-    for( unsigned int i = 0; i < VDimension; ++i )
-      {
-      size[i] *= supersample;
-      spacing[i] /= supersample;
-      }
-    region.SetSize( size );
-    }
+    inputImage->GetLargestPossibleRegion();
 
-  bool useOutputImages = false;
-  typename OutputImageType::Pointer outImageRidgeness =
-    OutputImageType::New();
-  typename OutputImageType::Pointer outImageRoundness =
-    OutputImageType::New();
-  typename OutputImageType::Pointer outImageCurvature =
-    OutputImageType::New();
-  typename OutputImageType::Pointer outImageLinearity =
-    OutputImageType::New();
-  if( !outputImagesBaseFileName.empty() )
-    {
-    useOutputImages = true;
-
-    outImageRidgeness->CopyInformation( inImage );
-    outImageRidgeness->SetSpacing( spacing );
-    outImageRidgeness->SetRegions( region );
-    outImageRidgeness->Allocate();
-
-    outImageRoundness->CopyInformation( inImage );
-    outImageRoundness->SetSpacing( spacing );
-    outImageRoundness->SetRegions( region );
-    outImageRoundness->Allocate();
-
-    outImageCurvature->CopyInformation( inImage );
-    outImageCurvature->SetSpacing( spacing );
-    outImageCurvature->SetRegions( region );
-    outImageCurvature->Allocate();
-
-    outImageLinearity->CopyInformation( inImage );
-    outImageLinearity->SetSpacing( spacing );
-    outImageLinearity->SetRegions( region );
-    outImageLinearity->Allocate();
-    }
-
-  bool useOutputDataStream = false;
+  std::string fileName = outputParametersFile + ".init.txt";
   std::ofstream outputDataStreamInit;
+  outputDataStreamInit.open( fileName.c_str(), std::ios::binary |
+    std::ios::out );
+  outputDataStreamInit.precision( 6 );
+
+  fileName = outputParametersFile + ".tube.txt";
   std::ofstream outputDataStreamTube;
+  outputDataStreamTube.open( fileName.c_str(), std::ios::binary |
+    std::ios::out );
+  outputDataStreamTube.precision( 6 );
+
+  fileName = outputParametersFile + ".bkg.txt";
   std::ofstream outputDataStreamBkg;
-  if( !outputDataFileBaseName.empty() )
-    {
-    useOutputDataStream = true;
-    std::string fileName = outputDataFileBaseName + ".init.txt";
-    outputDataStreamInit.open( fileName.c_str(), std::ios::binary |
-      std::ios::out );
-    outputDataStreamInit.precision( 6 );
-    fileName = outputDataFileBaseName + ".tube.txt";
-    outputDataStreamTube.open( fileName.c_str(), std::ios::binary |
-      std::ios::out );
-    outputDataStreamTube.precision( 6 );
-    fileName = outputDataFileBaseName + ".bkg.txt";
-    outputDataStreamBkg.open( fileName.c_str(), std::ios::binary |
-      std::ios::out );
-    outputDataStreamBkg.precision( 6 );
-    }
+  outputDataStreamBkg.open( fileName.c_str(), std::ios::binary |
+    std::ios::out );
+  outputDataStreamBkg.precision( 6 );
 
   SampleListType seed;
   SampleListType tube;
-  MetricVectorType tubeMean( 5, 0 );
   SampleListType bkg;
 
+  itk::ImageRegionIteratorWithIndex< InputImageType > itI(
+    inputImage, region );
   itk::ImageRegionIteratorWithIndex< MaskImageType > itM(
     maskImage, region );
-  itk::ImageRegionIteratorWithIndex< OutputImageType > itR(
-    outImageRidgeness, region );
-  itk::ImageRegionIteratorWithIndex< OutputImageType > itO(
-    outImageRoundness, region );
-  itk::ImageRegionIteratorWithIndex< OutputImageType > itC(
-    outImageCurvature, region );
-  itk::ImageRegionIteratorWithIndex< OutputImageType > itL(
-    outImageLinearity, region );
+  itk::ImageRegionIteratorWithIndex< ScaleImageType > itS(
+    scaleImage, region );
 
-  typename RidgeFuncType::Pointer ridgeFunc = RidgeFuncType::New();
-  ridgeFunc->SetInputImage( inImage );
-  ridgeFunc->SetScale( scale );
+  typename RidgeExtractorType::Pointer ridgeExtractor = RidgeExtractorType::New();
+  ridgeExtractor->SetInputImage( inputImage );
 
-  std::vector< int > failedCount( 5, 0 );
-  while( !itR.IsAtEnd() )
+  const double BIGD = 9999999999;
+
+  double scale = 0;
+  double scaleMin = BIGD;
+  double scaleMax = 0;
+
+  double dataMin = BIGD;
+  double dataMax = 0;
+
+  MetricVectorType instance(5, 0);
+  MetricVectorType instanceMin(5, BIGD);
+  MetricVectorType instanceMax(5, -BIGD);
+  typename RidgeExtractorType::IndexType minIndx;
+  typename RidgeExtractorType::IndexType maxIndx;
+  for( unsigned int i=0; i<VDimension; ++i )
     {
-    if( !useMask || itM.Get() == maskBackgroundId
+    minIndx[i] = region.GetIndex()[i] + 10;
+    maxIndx[i] = region.GetIndex()[i] + region.GetSize()[i] - 10;
+    }
+
+  ridgeExtractor->SetMinRidgeness( 0.6 );
+  ridgeExtractor->SetMinRidgenessStart( 0.6 );
+  ridgeExtractor->SetMinRoundness( -1 );
+  ridgeExtractor->SetMinRoundnessStart( -1 );
+  ridgeExtractor->SetMinCurvature( -1 );
+  ridgeExtractor->SetMinCurvatureStart( -1 );
+  ridgeExtractor->SetMinLevelness( -1 );
+  ridgeExtractor->SetMinLevelnessStart( -1 );
+  while( !itM.IsAtEnd() )
+    {
+    if( itM.Get() == maskBackgroundId
       || itM.Get() == maskTubeId )
       {
-      double supersampleFactor = 1.0 / supersample;
-      double intensity = 0;
-      double ridgeness = 0;
-      double roundness = 0;
-      double curvature = 0;
-      double linearity = 0;
-      typename RidgeFuncType::ContinuousIndexType cIndx;
-      if( supersample != 1 )
+      typename RidgeExtractorType::IndexType indx;
+      typename RidgeExtractorType::ContinuousIndexType cIndx;
+      indx = itM.GetIndex();
+      bool outOfBounds = false;
+      for( unsigned int i = 0; i < VDimension; ++i )
         {
-        for( unsigned int i = 0; i < VDimension; ++i )
+        cIndx[i] = indx[i];
+        if( indx[i] < minIndx[i] || indx[i] > maxIndx[i] )
           {
-          cIndx[i] = itR.GetIndex()[i] * supersampleFactor;
+          outOfBounds = true;
           }
         }
-      else
-        {
-        for( unsigned int i = 0; i < VDimension; ++i )
-          {
-          cIndx[i] = itR.GetIndex()[i];
-          }
-        }
-      if( itM.Get() == maskTubeId )
-        {
-        ridgeness = ridgeFunc->Ridgeness( cIndx, intensity, roundness,
-          curvature, linearity );
 
-        MetricVectorType instance(5, 0);
-        instance[0] = intensity;
-        instance[1] = ridgeness;
-        instance[2] = roundness;
-        instance[3] = curvature;
-        instance[4] = linearity;
-        seed.push_back( instance );
+      if( !outOfBounds )
+        {
+        scale = itS.Get();
+        ridgeExtractor->SetScale( scale );
 
-        if( useOutputDataStream )
+        if( itM.Get() == maskTubeId )
           {
+          double intensity = 0;
+          double ridgeness = 0;
+          double roundness = 0;
+          double curvature = 0;
+          double levelness = 0;
+          ridgeExtractor->Ridgeness( cIndx, intensity, roundness, curvature,
+            levelness );
+
+          instance[0] = intensity;
+          instance[1] = ridgeness;
+          instance[2] = roundness;
+          instance[3] = curvature;
+          instance[4] = levelness;
+          seed.push_back( instance );
+
           WriteOutputData< VDimension >( outputDataStreamInit, cIndx,
-            intensity, ridgeness, roundness, curvature, linearity );
+            instance[0], instance[1], instance[2], instance[3], instance[4] );
+
+          if( ridgeExtractor->LocalRidge( cIndx ) == RidgeExtractorType::SUCCESS )
+            {
+            if( scale < scaleMin )
+              {
+              scaleMin = scale;
+              }
+            else if( scale > scaleMax )
+              {
+              scaleMax = scale;
+              }
+
+            ridgeness = ridgeExtractor->Ridgeness( cIndx, intensity, roundness,
+              curvature, levelness );
+
+            instance[0] = intensity;
+            instance[1] = ridgeness;
+            instance[2] = roundness;
+            instance[3] = curvature;
+            instance[4] = levelness;
+            tube.push_back( instance );
+
+            WriteOutputData< VDimension >( outputDataStreamTube, cIndx,
+              intensity, ridgeness, roundness, curvature, levelness );
+            }
           }
-
-        ridgeFunc->LocalRidge( cIndx );
-        }
-
-      ridgeness = ridgeFunc->Ridgeness( cIndx, intensity, roundness,
-        curvature, linearity );
-      if( useOutputImages )
-        {
-        itR.Set( (OutputPixelType) ridgeness );
-        itO.Set( (OutputPixelType) roundness );
-        itC.Set( (OutputPixelType) curvature );
-        itL.Set( (OutputPixelType) linearity );
-        }
-
-      if( itM.Get() == maskTubeId )
-        {
-        MetricVectorType instance(5, 0);
-        instance[0] = intensity;
-        instance[1] = ridgeness;
-        instance[2] = roundness;
-        instance[3] = curvature;
-        instance[4] = linearity;
-        tube.push_back( instance );
-
-        int count = tube.size();
-        for( unsigned int f=0; f<5; ++f )
+        else if( itM.Get() == maskBackgroundId )
           {
-          tubeMean[f] += ( instance[f] - tubeMean[f] ) / ( count + 1 );
-          }
+          for( unsigned int i = 0; i < VDimension; ++i )
+            {
+            cIndx[i] = indx[i];
+            }
+          double intensity = 0;
+          double ridgeness = 0;
+          double roundness = 0;
+          double curvature = 0;
+          double levelness = 0;
+          ridgeExtractor->Ridgeness( cIndx, intensity, roundness, curvature,
+            levelness );
 
-        if( useOutputDataStream )
-          {
-          WriteOutputData< VDimension >( outputDataStreamTube, cIndx,
-            intensity, ridgeness, roundness, curvature, linearity );
-          }
-        }
-      else if( itM.Get() == maskBackgroundId )
-        {
-        MetricVectorType instance(5, 0);
-        instance[0] = intensity;
-        instance[1] = ridgeness;
-        instance[2] = roundness;
-        instance[3] = curvature;
-        instance[4] = linearity;
-        bkg.push_back( instance );
+          instance[0] = intensity;
+          instance[1] = ridgeness;
+          instance[2] = roundness;
+          instance[3] = curvature;
+          instance[4] = levelness;
+          bkg.push_back( instance );
 
-        if( useOutputDataStream )
-          {
           WriteOutputData< VDimension >( outputDataStreamBkg, cIndx,
-            intensity, ridgeness, roundness, curvature, linearity );
+            instance[0], instance[1], instance[2], instance[3], instance[4] );
           }
         }
       }
-    if( useMask )
+
+    double intensity = itI.Get();
+
+    if( intensity < dataMin )
       {
-      ++itM;
+      dataMin = intensity;
       }
-    if( useOutputImages )
+    if( intensity > dataMax )
       {
-      ++itR;
-      ++itO;
-      ++itC;
-      ++itL;
+      dataMax = intensity;
       }
+
+    ++itI;
+    ++itS;
+    ++itM;
     }
 
-  MyOptFunc myFunc;
-  myFunc.SetTubeSampleList( & tube );
-  myFunc.SetBkgSampleList( & bkg );
-  MyOptFuncDeriv myFuncD;
-  myFuncD.SetTubeSampleList( & tube );
-  myFuncD.SetBkgSampleList( & bkg );
-
-  tube::BrentOptimizer1D opt1D;
-  tube::OptimizerND opt( 2, &myFunc, &myFuncD, &opt1D );
-
-  MetricVectorType xMin( 5, 0 );
-  opt.SetXMin( xMin );
-
-  MetricVectorType xMax( 5, 1 );
-  opt.SetXMax( xMax );
-
-  opt.SetTolerance( 0.0001 );
-  opt.SetMaxIterations( 30000 );
-  opt.SetSearchForMin( true );
-
-  double xVal = 500;
-  MetricVectorType x( 5 );
-  for( unsigned int f=0; f<5; ++f )
-    {
-    x[f] = tubeMean[f];
-    }
-
-  MetricVectorType xStep( 5, 0.1 );
-  opt.SetXStep( xStep );
-  myFuncD.SetXStep( xStep );
-  if( !opt.Extreme( x, &xVal ) )
-    {
-    std::cout << "Optimization failed!" << std::endl;
-    }
-  std::cout << "x = " << x << std::endl;
-  std::cout << "   xVal = " << xVal << std::endl;
-
-  MetricVectorType xStep2( 5, 0.01 );
-  opt.SetXStep( xStep2 );
-  myFuncD.SetXStep( xStep2 );
-  if( !opt.Extreme( x, &xVal ) )
-    {
-    std::cout << "Optimization failed!" << std::endl;
-    }
-  std::cout << "x = " << x << std::endl;
-  std::cout << "   xVal = " << xVal << std::endl;
-
-  MetricVectorType xStep3( 5, 0.001 );
-  opt.SetXStep( xStep3 );
-  myFuncD.SetXStep( xStep3 );
-  if( !opt.Extreme( x, &xVal ) )
-    {
-    std::cout << "Optimization failed!" << std::endl;
-    }
-  std::cout << "x = " << x << std::endl;
-  std::cout << "   xVal = " << xVal << std::endl;
-
-  if( useOutputDataStream )
-    {
-    outputDataStreamBkg.close();
-    outputDataStreamTube.close();
-    }
+  outputDataStreamBkg.close();
+  outputDataStreamTube.close();
+  outputDataStreamInit.close();
   timeCollector.Stop("Compute ridgeness images");
 
+
   int result = EXIT_SUCCESS;
-  if( useOutputImages )
+
+  //
+  //
+  itk::tube::MetaTubeExtractor params;
+
+  // Heuristics to identify common intensity ranges
+  if( dataMin > -0.5 && dataMin < 0.5 &&
+    dataMax > 0.5 && dataMax <= 1.5 )
     {
-    timeCollector.Start("Save data");
-
-    std::string outName = outputImagesBaseFileName + ".ridge.mha";
-    result = WriteOutputImage< OutputImageType >( outName,
-      outImageRidgeness );
-
-    outName = outputImagesBaseFileName + ".round.mha";
-    result += WriteOutputImage< OutputImageType >( outName,
-      outImageRoundness );
-
-    outName = outputImagesBaseFileName + ".curve.mha";
-    result += WriteOutputImage< OutputImageType >( outName,
-      outImageCurvature );
-
-    outName = outputImagesBaseFileName + ".line.mha";
-    result += WriteOutputImage< OutputImageType >( outName,
-      outImageLinearity );
-
-    timeCollector.Stop("Save data");
+    // Synthetic: 0 to 1
+    dataMin = 0;
+    dataMax = 1;
+    }
+  else if( dataMin > -10 && dataMin < 50 &&
+    dataMax > 200 && dataMax <= 300 )
+    {
+    // MRI or synthetic: 0 to 255
+    dataMin = 0;
+    dataMax = 255;
+    }
+  else if( dataMin > -20 && dataMin < 100 &&
+    dataMax > 420 && dataMax <= 600 )
+    {
+    // MRI or synthetic: 0 to 512
+    dataMin = 0;
+    dataMax = 512;
+    }
+  else if( dataMin > -1100 && dataMin < -900 &&
+    dataMax > 900 && dataMax <= 3100 )
+    { // 900 = cancellous bone
+    dataMin = -1000;  // Air in HU
+    dataMax = 3000;    // Dense bone in HU
     }
 
-  //
-  //
-  itk::tube::MetaTubeParams params;
-
-  itk::tube::MetaTubeParams::VectorType seedScales( 1, 1.0 );
-  double seedIntensityMin = 0;
-  double seedIntensityMax = 0;
-  double seedIntensityPercentile = 0;
-  params.SetSeedParams( seedScales, seedIntensityMin, seedIntensityMax,
-    seedIntensityPercentile );
-
-  double tubeIntensityMin = 0;
-  double tubeIntensityMax = 0;
-  bool   tubeBright = true;
-  itk::tube::MetaTubeParams::VectorType tubeColor(4, 0.0);
+  itk::tube::MetaTubeExtractor::VectorType tubeColor(4, 0.0);
   tubeColor[0] = 1.0;
   tubeColor[3] = 1.0;
 
-  params.SetTubeParams( tubeIntensityMin, tubeIntensityMax,
-    tubeBright, tubeColor );
+  params.SetGeneralProperties( dataMin, dataMax, tubeColor );
 
-  double ridgeScale = scale;
-  double ridgeScaleExtent = 1.5;
+  if( scaleMax == scaleMin )
+    {
+    scaleMax = 10 * scaleMin;
+    }
+  double scaleRange = scaleMax - scaleMin;
+  double ridgeScale = scaleMin + 0.25 * scaleRange;
+  double ridgeScaleKernelExtent = 2.5;
+
   bool   ridgeDynamicScale = true;
-  double ridgeStepX = 0.2;
-  double ridgeThreshTangentChange = 0.8;
-  double ridgeThreshXChange = 0.5;
-  double ridgeThreshRidgeness = x[1];
-  double ridgeThreshRidgenessStart = x[1];
-  double ridgeThreshRoundness = x[2];
-  double ridgeThreshRoundnessStart = x[2];
-  double ridgeCurvatureMax = x[3];
-  double ridgeThreshCurvature = x[3];
-  double ridgeThreshCurvatureStart = x[3];
-  double ridgeThreshLinearity = x[4];
-  double ridgeThreshLinearityStart = x[4];
-  int    ridgeRecoveryMax = 3;
-  params.SetTubeRidgeParams( ridgeScale, ridgeScaleExtent,
-    ridgeDynamicScale, ridgeStepX,
-    ridgeThreshTangentChange,
-    ridgeThreshXChange,
-    ridgeThreshRidgeness, ridgeThreshRidgenessStart,
-    ridgeThreshRoundness, ridgeThreshRoundnessStart,
-    ridgeCurvatureMax,
-    ridgeThreshCurvature, ridgeThreshCurvatureStart,
-    ridgeThreshLinearity, ridgeThreshLinearityStart,
-    ridgeRecoveryMax );
 
-  double radiusScale = scale;
-  double radiusMin = 0.3;
-  double radiusMax = 10;
-  double radiusThreshMedialness = 0.04;
-  double radiusThreshMedialnessStart = 0.01;
-  params.SetTubeRadiusParams( radiusScale,
+  bool   ridgeDynamicStepSize = false;
+
+  double ridgeStepX = 0.1;
+
+  double ridgeMaxTangentChange = 0.75;
+
+  double ridgeMaxXChange = 3.0;
+
+  double portion = 1.0 / 1000.0;
+  int clippedMax = (int)(tube.size() * portion);
+  portion = 1.0 / 500.0;
+  int clippedMaxStart = (int)(tube.size() * portion);
+
+  sort_column = 1;
+  std::sort( tube.begin(), tube.end(), sort_column_compare );
+  double ridgeMinRidgeness = tube[clippedMax][1];
+  double ridgeMinRidgenessStart = tube[clippedMaxStart][1];
+
+  sort_column = 2;
+  std::sort( tube.begin(), tube.end(), sort_column_compare );
+  double ridgeMinRoundness = tube[clippedMax][2];
+  double ridgeMinRoundnessStart = tube[clippedMaxStart][2];
+
+  sort_column = 3;
+  std::sort( tube.begin(), tube.end(), sort_column_compare );
+  double ridgeMinCurvature = tube[clippedMax][3];
+  double ridgeMinCurvatureStart = tube[clippedMaxStart][3];
+
+  sort_column = 4;
+  std::sort( tube.begin(), tube.end(), sort_column_compare );
+  double ridgeMinLevelness = tube[clippedMax][4];
+  double ridgeMinLevelnessStart = tube[clippedMaxStart][4];
+
+  int    ridgeMaxRecoveryAttempts = 3;
+
+  params.SetRidgeProperties( ridgeScale, ridgeScaleKernelExtent,
+    ridgeDynamicScale,
+    ridgeDynamicStepSize,
+    ridgeStepX,
+    ridgeMaxTangentChange,
+    ridgeMaxXChange,
+    ridgeMinRidgeness, ridgeMinRidgenessStart,
+    ridgeMinRoundness, ridgeMinRoundnessStart,
+    ridgeMinCurvature, ridgeMinCurvatureStart,
+    ridgeMinLevelness, ridgeMinLevelnessStart,
+    ridgeMaxRecoveryAttempts );
+
+  double radiusStart = ridgeScale / inputImage->GetSpacing()[0];
+  double radiusMin = ( 0.2 * scaleMin ) / inputImage->GetSpacing()[0];
+  if( radiusMin < 0.3 )
+    {
+    radiusMin = 0.3;
+    }
+  double radiusMax = ( scaleMax + 0.5 * scaleRange ) /
+    inputImage->GetSpacing()[0];
+
+  // Should be a function of curvature
+  double radiusMinMedialness = ridgeMinCurvature / 100;
+  double radiusMinMedialnessStart = ridgeMinCurvatureStart / 100;
+
+  params.SetRadiusProperties( radiusStart,
     radiusMin, radiusMax,
-    radiusThreshMedialness, radiusThreshMedialnessStart );
+    radiusMinMedialness, radiusMinMedialnessStart );
 
   params.Write( outputParametersFile.c_str() );
 

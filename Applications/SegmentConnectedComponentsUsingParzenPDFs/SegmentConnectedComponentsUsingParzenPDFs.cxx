@@ -21,7 +21,7 @@ limitations under the License.
 
 =========================================================================*/
 
-#include "itktubePDFSegmenter.h"
+#include "itktubePDFSegmenterParzen.h"
 #include "tubeMacro.h"
 
 #include "SegmentConnectedComponentsUsingParzenPDFsCLP.h"
@@ -72,7 +72,7 @@ CheckImageAttributes( const TInputImage * input,
     && inputRegion.GetSize() == maskRegion.GetSize() );
 }
 
-template< class T, unsigned int N, unsigned int dimension >
+template< class T, unsigned int dimension >
 int DoIt( int argc, char * argv[] )
 {
   PARSE_ARGS;
@@ -84,7 +84,11 @@ int DoIt( int argc, char * argv[] )
   typedef itk::Image< float, dimension >           ProbImageType;
   typedef itk::Image< unsigned short, dimension >  LabelMapType;
 
-  typedef itk::Image< float, N >                   PDFImageType;
+  typedef itk::tube::PDFSegmenterParzen< InputImageType, LabelMapType >
+    PDFSegmenterType;
+
+  typedef itk::Image< float, PARZEN_MAX_NUMBER_OF_FEATURES >
+    PDFImageType;
 
   typedef itk::ImageFileReader< InputImageType >   ImageReaderType;
   typedef itk::ImageFileReader< LabelMapType >     LabelMapReaderType;
@@ -93,9 +97,14 @@ int DoIt( int argc, char * argv[] )
   typedef itk::ImageFileWriter< PDFImageType >     PDFImageWriterType;
   typedef itk::ImageFileReader< PDFImageType >     PDFImageReaderType;
 
-  typedef itk::tube::PDFSegmenter< InputImageType, N, LabelMapType >
-    PDFSegmenterType;
-  typename PDFSegmenterType::Pointer pdfSegmenter = PDFSegmenterType::New();
+  typename PDFSegmenterType::Pointer pdfSegmenter =
+    PDFSegmenterType::New();
+
+  typedef itk::tube::FeatureVectorGenerator< InputImageType >
+    FeatureVectorGeneratorType;
+  typename FeatureVectorGeneratorType::Pointer fvGenerator =
+    FeatureVectorGeneratorType::New();
+
 
   timeCollector.Start( "LoadData" );
 
@@ -105,8 +114,21 @@ int DoIt( int argc, char * argv[] )
   inLabelMapReader->Update();
   pdfSegmenter->SetLabelMap( inLabelMapReader->GetOutput() );
 
+  unsigned int numFeatures = 0;
+  if( inputVolume1.size() > 1 )
+    {
+    ++numFeatures;
+    if( inputVolume2.size() > 1 )
+      {
+      ++numFeatures;
+      if( inputVolume3.size() > 1 )
+        {
+        ++numFeatures;
+        }
+      }
+    }
   typename ImageReaderType::Pointer reader;
-  for( unsigned int i = 0; i < N; i++ )
+  for( unsigned int i = 0; i < numFeatures; i++ )
     {
     reader = ImageReaderType::New();
     if( i == 0 )
@@ -129,8 +151,9 @@ int DoIt( int argc, char * argv[] )
       {
       std::cout << "ERROR: current command line xml file limits"
                 << " this filter to 4 input images" << std::endl;
-      return 1;
+      return EXIT_FAILURE;
       }
+    std::cout << "Here2" << std::endl;
     reader->Update();
     if( !CheckImageAttributes( reader->GetOutput(),
         inLabelMapReader->GetOutput() ) )
@@ -140,18 +163,29 @@ int DoIt( int argc, char * argv[] )
         << "origin." << std::endl;
       return EXIT_FAILURE;
       }
-    pdfSegmenter->SetInput( i, reader->GetOutput() );
+    if( i == 1 )
+      {
+      fvGenerator->SetInput( reader->GetOutput() );
+      }
+    else
+      {
+      fvGenerator->AddInput( reader->GetOutput() );
+      }
     }
+
+  pdfSegmenter->SetFeatureVectorGenerator( fvGenerator );
 
   timeCollector.Stop( "LoadData" );
 
-  for( unsigned int o = 0; o < objectId.size(); o++ )
+  pdfSegmenter->SetObjectId( objectId[0] );
+  for( unsigned int o = 1; o < objectId.size(); o++ )
     {
     pdfSegmenter->AddObjectId( objectId[o] );
     }
   pdfSegmenter->SetVoidId( voidId );
   pdfSegmenter->SetErodeRadius( erodeRadius );
   pdfSegmenter->SetHoleFillIterations( holeFillIterations );
+  pdfSegmenter->SetDilateFirst( dilateFirst );
   if( objectPDFWeight.size() == objectId.size() )
     {
     for( unsigned int i = 0; i < objectPDFWeight.size(); i++ )
@@ -160,8 +194,9 @@ int DoIt( int argc, char * argv[] )
       }
     }
   pdfSegmenter->SetProbabilityImageSmoothingStandardDeviation(
-    probSmoothingStdDev );
-  pdfSegmenter->SetDraft( draft );
+    probImageSmoothingStdDev );
+  pdfSegmenter->SetHistogramSmoothingStandardDeviation(
+    histogramSmoothingStdDev );
   pdfSegmenter->SetReclassifyNotObjectLabels( reclassifyNotObjectLabels );
   pdfSegmenter->SetReclassifyObjectLabels( reclassifyObjectLabels );
   if( forceClassification )
@@ -182,7 +217,9 @@ int DoIt( int argc, char * argv[] )
       typename PDFImageReaderType::Pointer pdfImageReader =
         PDFImageReaderType::New();
       pdfImageReader->SetFileName( fname.c_str() );
+      std::cout << "Here3" << std::endl;
       pdfImageReader->Update();
+      std::cout << "Here4" << std::endl;
       typename PDFImageType::Pointer img = pdfImageReader->GetOutput();
       if( i == 0 )
         {
@@ -192,7 +229,7 @@ int DoIt( int argc, char * argv[] )
         tmpSpacing.resize( dimension );
         typename PDFImageType::PointType origin = img->GetOrigin();
         typename PDFImageType::SpacingType spacing = img->GetSpacing();
-        for( unsigned int d=0; d<N; ++d )
+        for( unsigned int d=0; d<numFeatures; ++d )
           {
           tmpOrigin[d] = origin[d];
           tmpSpacing[d] = spacing[d];
@@ -225,7 +262,7 @@ int DoIt( int argc, char * argv[] )
         ProbImageWriterType::New();
       probImageWriter->SetFileName( fname.c_str() );
       probImageWriter->SetInput( pdfSegmenter->
-        GetClassProbabilityForInput( i ) );
+        GetClassProbabilityImage( i ) );
       probImageWriter->Update();
       }
     }
@@ -277,78 +314,19 @@ int main( int argc, char * argv[] )
 
     GetImageInformation( inputVolume1, imageType, imageDimension );
 
-    int N = 1;
-    if( !inputVolume2.empty() )
-      {
-      ++N;
-      if( !inputVolume3.empty() )
-        {
-        ++N;
-        if( !inputVolume4.empty() )
-          {
-          ++N;
-          }
-        }
-      }
-
     if( imageDimension == 2 )
       {
       switch( imageType )
         {
         case itk::ImageIOBase::UCHAR:
-          if( N == 1 )
-            {
-            return DoIt<unsigned char, 1, 2>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<unsigned char, 2, 2>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<unsigned char, 3, 2>( argc, argv );
-            }
-          else
-            {
-            return DoIt<unsigned char, 4, 2>( argc, argv );
-            }
+          return DoIt<unsigned char, 2>( argc, argv );
           break;
         case itk::ImageIOBase::USHORT:
-          if( N == 1 )
-            {
-            return DoIt<unsigned short, 1, 2>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<unsigned short, 2, 2>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<unsigned short, 3, 2>( argc, argv );
-            }
-          else
-            {
-            return DoIt<unsigned short, 4, 2>( argc, argv );
-            }
+          return DoIt<unsigned short, 2>( argc, argv );
           break;
         case itk::ImageIOBase::CHAR:
         case itk::ImageIOBase::SHORT:
-          if( N == 1 )
-            {
-            return DoIt<short, 1, 2>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<short, 2, 2>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<short, 3, 2>( argc, argv );
-            }
-          else
-            {
-            return DoIt<short, 4, 2>( argc, argv );
-            }
+          return DoIt<short, 2>( argc, argv );
           break;
         case itk::ImageIOBase::UINT:
         case itk::ImageIOBase::INT:
@@ -356,22 +334,7 @@ int main( int argc, char * argv[] )
         case itk::ImageIOBase::LONG:
         case itk::ImageIOBase::FLOAT:
         case itk::ImageIOBase::DOUBLE:
-          if( N == 1 )
-            {
-            return DoIt<float, 1, 2>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<float, 2, 2>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<float, 3, 2>( argc, argv );
-            }
-          else
-            {
-            return DoIt<float, 4, 2>( argc, argv );
-            }
+          return DoIt<float, 2>( argc, argv );
           break;
         case itk::ImageIOBase::UNKNOWNCOMPONENTTYPE:
         default:
@@ -384,59 +347,14 @@ int main( int argc, char * argv[] )
       switch( imageType )
         {
         case itk::ImageIOBase::UCHAR:
-          if( N == 1 )
-            {
-            return DoIt<unsigned char, 1, 3>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<unsigned char, 2, 3>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<unsigned char, 3, 3>( argc, argv );
-            }
-          else
-            {
-            return DoIt<unsigned char, 4, 3>( argc, argv );
-            }
+          return DoIt<unsigned char, 3>( argc, argv );
           break;
         case itk::ImageIOBase::USHORT:
-          if( N == 1 )
-            {
-            return DoIt<unsigned short, 1, 3>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<unsigned short, 2, 3>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<unsigned short, 3, 3>( argc, argv );
-            }
-          else
-            {
-            return DoIt<unsigned short, 4, 3>( argc, argv );
-            }
+          return DoIt<unsigned short, 3>( argc, argv );
           break;
         case itk::ImageIOBase::CHAR:
         case itk::ImageIOBase::SHORT:
-          if( N == 1 )
-            {
-            return DoIt<short, 1, 3>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<short, 2, 3>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<short, 3, 3>( argc, argv );
-            }
-          else
-            {
-            return DoIt<short, 4, 3>( argc, argv );
-            }
+          return DoIt<short, 3>( argc, argv );
           break;
         case itk::ImageIOBase::UINT:
         case itk::ImageIOBase::INT:
@@ -444,22 +362,7 @@ int main( int argc, char * argv[] )
         case itk::ImageIOBase::LONG:
         case itk::ImageIOBase::FLOAT:
         case itk::ImageIOBase::DOUBLE:
-          if( N == 1 )
-            {
-            return DoIt<float, 1, 3>( argc, argv );
-            }
-          else if( N == 2 )
-            {
-            return DoIt<float, 2, 3>( argc, argv );
-            }
-          else if( N == 3 )
-            {
-            return DoIt<float, 3, 3>( argc, argv );
-            }
-          else
-            {
-            return DoIt<float, 4, 3>( argc, argv );
-            }
+          return DoIt<float, 3>( argc, argv );
           break;
         case itk::ImageIOBase::UNKNOWNCOMPONENTTYPE:
         default:

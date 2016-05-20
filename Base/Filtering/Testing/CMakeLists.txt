@@ -30,6 +30,9 @@ set( MIDAS_KEY_DIR ${TubeTK_SOURCE_DIR}/MIDAS_Keys )
 find_package( SlicerExecutionModel REQUIRED )
 include( ${SlicerExecutionModel_USE_FILE} )
 
+find_package( ITK REQUIRED )
+include( ${ITK_USE_FILE} )
+
 find_package( PythonInterp )
 if( PYTHON_EXECUTABLE )
   add_test( PrintSelf-BaseFiltering ${PYTHON_EXECUTABLE}
@@ -50,15 +53,25 @@ set( tubeBaseFilteringTests_SRCS
   itktubeAnisotropicCoherenceEnhancingDiffusionImageFilterTest.cxx
   itktubeAnisotropicEdgeEnhancementDiffusionImageFilterTest.cxx
   itktubeAnisotropicHybridDiffusionImageFilterTest.cxx
+  itktubeCVTImageFilterTest.cxx
   itktubeExtractTubePointsSpatialObjectFilterTest.cxx
+  itktubeFFTGaussianDerivativeIFFTFilterTest.cxx
+  itktubeRidgeFFTFilterTest.cxx
   itktubeSheetnessMeasureImageFilterTest.cxx
   itktubeSheetnessMeasureImageFilterTest2.cxx
-  itktubeShrinkUsingMaxImageFilterTest.cxx
+  itktubeShrinkWithBlendingImageFilterTest.cxx
   itktubeStructureTensorRecursiveGaussianImageFilterTest.cxx
   itktubeStructureTensorRecursiveGaussianImageFilterTestNew.cxx
   itktubeSubSampleTubeSpatialObjectFilterTest.cxx
   itktubeSubSampleTubeTreeSpatialObjectFilterTest.cxx
+  itktubeTortuositySpatialObjectFilterTest.cxx
   itktubeTubeEnhancingDiffusion2DImageFilterTest.cxx )
+
+# Add tests of filters based on the ArrayFire Library
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  list( APPEND tubeBaseFilteringTests_SRCS
+    itktubeGPUArrayFireGaussianDerivativeFilterTest.cxx )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
 
 include_directories(
   ${TubeTK_SOURCE_DIR}/Base/Common
@@ -68,7 +81,15 @@ include_directories(
 add_executable( tubeBaseFilteringHeaderTest
   tubeBaseFilteringHeaderTest.cxx )
 target_link_libraries( tubeBaseFilteringHeaderTest
-  ${ITK_LIBRARIES} )
+  TubeTKFiltering ${ITK_LIBRARIES} )
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  target_link_libraries( tubeBaseFilteringHeaderTest ${ArrayFire_LIBRARIES} )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
+
+set( no_install_option )
+if( NOT TubeTK_INSTALL_DEVELOPMENT )
+  set( no_install_option NO_INSTALL )
+endif()
 
 SEMMacroBuildCLI(
   NAME tubeBaseFilteringTests
@@ -76,16 +97,14 @@ SEMMacroBuildCLI(
     ${tubeBaseFilteringTests_SRCS}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
   TARGET_LIBRARIES
-    ${ITK_LIBRARIES}
-  INCLUDE_DIRECTORIES
-    ${TubeTK_SOURCE_DIR}/Base/Common
-    ${TubeTK_SOURCE_DIR}/Base/Filtering
-    ${TubeTK_SOURCE_DIR}/Base/Numerics
-  INSTALL_RUNTIME_DESTINATION lib
-  INSTALL_LIBRARY_DESTINATION lib
-  INSTALL_ARCHIVE_DESTINATION bin
+    TubeCLI TubeTKFiltering
+    ${ITK_LIBRARIES} ITKIOMeta ITKIOSpatialObjects
   EXECUTABLE_ONLY
+  ${no_install_option}
   )
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  target_link_libraries( tubeBaseFilteringTests ${ArrayFire_LIBRARIES} )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
 
 add_test( NAME tubeBaseFilteringHeaderTest
   COMMAND ${BASE_FILTERING_HEADER_TEST} )
@@ -94,10 +113,93 @@ add_test( NAME tubeBaseFilteringPrintTest
   COMMAND ${BASE_FILTERING_TESTS}
     tubeBaseFilteringPrintTest )
 
+Midas3FunctionAddTest( NAME itktubeCVTImageFilterTest
+  COMMAND ${BASE_FILTERING_TESTS}
+    itktubeCVTImageFilterTest
+      MIDAS{GDS0015_1.mha.md5}
+      ${TEMP}/itktubeCVTImageFilterTest.mha )
+
 Midas3FunctionAddTest( NAME itktubeExtractTubePointsSpatialObjectFilterTest
   COMMAND ${BASE_FILTERING_TESTS}
     itktubeExtractTubePointsSpatialObjectFilterTest
       MIDAS{VascularNetwork.tre.md5} )
+
+Midas3FunctionAddTest( NAME itktubeFFTGaussianDerivativeIFFTFilterTest1
+  COMMAND ${BASE_FILTERING_TESTS}
+    --compareIntensityTolerance 0.01
+    --compare MIDAS{itktubeFFTGaussianDerivativeIFFTFilterTest1.mha.md5}
+      ${TEMP}/itktubeFFTGaussianDerivativeIFFTFilterTest1.mha
+    itktubeFFTGaussianDerivativeIFFTFilterTest
+      0 0 0.1 0.1
+      MIDAS{im0001.mha.md5}
+      ${TEMP}/itktubeFFTGaussianDerivativeIFFTFilterTest1.mha )
+
+Midas3FunctionAddTest( NAME itktubeFFTGaussianDerivativeIFFTFilterTest2
+  COMMAND ${BASE_FILTERING_TESTS}
+    --compareIntensityTolerance 0.01
+    --compare MIDAS{itktubeFFTGaussianDerivativeIFFTFilterTest2.mha.md5}
+      ${TEMP}/itktubeFFTGaussianDerivativeIFFTFilterTest2.mha
+    itktubeFFTGaussianDerivativeIFFTFilterTest
+      0 1 0.1 1
+      MIDAS{im0001.mha.md5}
+      ${TEMP}/itktubeFFTGaussianDerivativeIFFTFilterTest2.mha )
+
+Midas3FunctionAddTest( NAME itktubeFFTGaussianDerivativeIFFTFilterTest3
+  COMMAND ${BASE_FILTERING_TESTS}
+    --compareIntensityTolerance 0.01
+    --compare MIDAS{itktubeFFTGaussianDerivativeIFFTFilterTest3.mha.md5}
+      ${TEMP}/itktubeFFTGaussianDerivativeIFFTFilterTest3.mha
+    itktubeFFTGaussianDerivativeIFFTFilterTest
+      2 2 2 2
+      MIDAS{im0001.mha.md5}
+      ${TEMP}/itktubeFFTGaussianDerivativeIFFTFilterTest3.mha )
+
+# GPU ArrayFire Gaussian Derivative Tests - begin
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  Midas3FunctionAddTest( NAME itktubeGPUArrayFireGaussianDerivativeFilterTest1
+    COMMAND ${BASE_FILTERING_TESTS}
+      --compareIntensityTolerance 0.01
+      --compare MIDAS{itktubeGPUArrayFireGaussianDerivativeFilterTest1.mha.md5}
+        ${TEMP}/itktubeGPUArrayFireGaussianDerivativeFilterTest1.mha
+      itktubeGPUArrayFireGaussianDerivativeFilterTest
+        0 0 0.1 0.1
+        MIDAS{im0001.mha.md5}
+        ${TEMP}/itktubeGPUArrayFireGaussianDerivativeFilterTest1.mha )
+
+  Midas3FunctionAddTest( NAME itktubeGPUArrayFireGaussianDerivativeFilterTest2
+    COMMAND ${BASE_FILTERING_TESTS}
+      --compareIntensityTolerance 0.01
+      --compare MIDAS{itktubeGPUArrayFireGaussianDerivativeFilterTest2.mha.md5}
+        ${TEMP}/itktubeGPUArrayFireGaussianDerivativeFilterTest2.mha
+      itktubeGPUArrayFireGaussianDerivativeFilterTest
+        0 1 0.1 1
+        MIDAS{im0001.mha.md5}
+        ${TEMP}/itktubeGPUArrayFireGaussianDerivativeFilterTest2.mha )
+
+  Midas3FunctionAddTest( NAME itktubeGPUArrayFireGaussianDerivativeFilterTest3
+    COMMAND ${BASE_FILTERING_TESTS}
+      --compareIntensityTolerance 0.01
+      --compare MIDAS{itktubeGPUArrayFireGaussianDerivativeFilterTest3.mha.md5}
+        ${TEMP}/itktubeGPUArrayFireGaussianDerivativeFilterTest3.mha
+      itktubeGPUArrayFireGaussianDerivativeFilterTest
+        2 2 2 2
+        MIDAS{im0001.mha.md5}
+        ${TEMP}/itktubeGPUArrayFireGaussianDerivativeFilterTest3.mha )
+
+endif( TubeTK_USE_GPU_ARRAYFIRE )
+# GPU ArrayFire Gaussian Derivative Tests - end
+
+#--compare MIDAS{itktubeRidgeFFTFilterTest1.mha.md5}
+#${TEMP}/itktubeRidgeFFTFilterTest1.mha
+Midas3FunctionAddTest( NAME itktubeRidgeFFTFilterTest1
+  COMMAND ${BASE_FILTERING_TESTS}
+    itktubeRidgeFFTFilterTest
+      2
+      MIDAS{Branch.n010.mha.md5}
+      ${TEMP}/itktubeRidgeFFTFilterTest1_Ridgeness.mha
+      ${TEMP}/itktubeRidgeFFTFilterTest1_Roundness.mha
+      ${TEMP}/itktubeRidgeFFTFilterTest1_Curvature.mha
+      ${TEMP}/itktubeRidgeFFTFilterTest1_Levelness.mha )
 
 add_test( NAME itktubeSheetnessMeasureImageFilterTest
   COMMAND ${BASE_FILTERING_TESTS}
@@ -117,14 +219,14 @@ Midas3FunctionAddTest( NAME itktubeSheetnessMeasureImageFilterTest3
       ${TEMP}/UltrasoundCroppedResampledSheetnessMeasure.mha
       ${TEMP}/UltrasoundCroppedResampledPrimaryEigenVector.mha 2.0 )
 
-Midas3FunctionAddTest( NAME itktubeShrinkUsingMaxImageFilterTest
+    Midas3FunctionAddTest( NAME itktubeShrinkWithBlendingImageFilterTest
   COMMAND ${BASE_FILTERING_TESTS}
-    --compare MIDAS{itktubeShrinkUsingMaxImageFilterTest.mha.md5}
-      ${TEMP}/itktubeShrinkUsingMaxImageFilterTest.mha
-    itktubeShrinkUsingMaxImageFilterTest
+  --compare MIDAS{itktubeShrinkWithBlendingImageFilterTest.mha.md5}
+  ${TEMP}/itktubeShrinkWithBlendingImageFilterTest.mha
+  itktubeShrinkWithBlendingImageFilterTest
       MIDAS{im0001.crop.contrast.mha.md5}
-      ${TEMP}/itktubeShrinkUsingMaxImageFilterTest.mha
-      ${TEMP}/itktubeShrinkUsingMaxImageFilterTest-IndexImage.mha )
+      ${TEMP}/itktubeShrinkWithBlendingImageFilterTest.mha
+      ${TEMP}/itktubeShrinkWithBlendingImageFilterTest-IndexImage.mha )
 
 Midas3FunctionAddTest( NAME itktubeStructureTensorRecursiveGaussianImageFilterTest
   COMMAND ${BASE_FILTERING_TESTS}
@@ -158,50 +260,55 @@ Midas3FunctionAddTest( NAME itktubeSubSampleTubeTreeSpatialObjectFilterTest
 
 Midas3FunctionAddTest( NAME itktubeTubeEnhancingDiffusion2DImageFilterTest
   COMMAND ${BASE_FILTERING_TESTS}
-    --compare MIDAS{itkTubeEnhancingDiffusion2DImageFilterTest.mha.md5}
-      ${TEMP}/itkTubeEnhancingDiffusion2DImageFilterTest.mha
     --compareIntensityTolerance 0.001
+    --compare MIDAS{itktubeEnhancingDiffusion2DImageFilterTest.mha.md5}
+      ${TEMP}/itktubeEnhancingDiffusion2DImageFilterTest.mha
     itktubeTubeEnhancingDiffusion2DImageFilterTest
       MIDAS{ES0015_1_Subs.mha.md5}
-      ${TEMP}/itkTubeEnhancingDiffusion2DImageFilterTest.mha )
+      ${TEMP}/itktubeEnhancingDiffusion2DImageFilterTest.mha )
 
 Midas3FunctionAddTest( NAME itktubeTubeEnhancingDiffusion2DImageFilterRetinaTest
   COMMAND ${BASE_FILTERING_TESTS}
-    --compare MIDAS{itkTubeEnhancingDiffusion2DImageFilterRetinaTest.mha.md5}
-      ${TEMP}/itkTubeEnhancingDiffusion2DImageFilterRetinaTest.mha
     --compareIntensityTolerance 0.001
+    --compare MIDAS{itktubeEnhancingDiffusion2DImageFilterRetinaTest.mha.md5}
+      ${TEMP}/itktubeEnhancingDiffusion2DImageFilterRetinaTest.mha
     itktubeTubeEnhancingDiffusion2DImageFilterTest
       MIDAS{im0001.crop2.mha.md5}
-      ${TEMP}/itkTubeEnhancingDiffusion2DImageFilterRetinaTest.mha
+      ${TEMP}/itktubeEnhancingDiffusion2DImageFilterRetinaTest.mha
       true )
 
-Midas3FunctionAddTest( NAME itktubeTubeEnhancingDiffusion2DImageFilterRetina10Test
+Midas3FunctionAddTest( NAME
+  itktubeTubeEnhancingDiffusion2DImageFilterRetina10Test
   COMMAND ${BASE_FILTERING_TESTS}
-    --compare MIDAS{itkTubeEnhancingDiffusion2DImageFilterRetina10Test.mha.md5}
-      ${TEMP}/itkTubeEnhancingDiffusion2DImageFilterRetina10Test.mha
     --compareIntensityTolerance 0.001
+    --compare MIDAS{itktubeEnhancingDiffusion2DImageFilterRetina10Test.mha.md5}
+      ${TEMP}/itktubeEnhancingDiffusion2DImageFilterRetina10Test.mha
     itktubeTubeEnhancingDiffusion2DImageFilterTest
       MIDAS{im0001_n10.crop2.mha.md5}
-      ${TEMP}/itkTubeEnhancingDiffusion2DImageFilterRetina10Test.mha
+      ${TEMP}/itktubeEnhancingDiffusion2DImageFilterRetina10Test.mha
       true )
 
 Midas3FunctionAddTest( NAME itktubeAnisotropicHybridDiffusionImageFilterTest
  COMMAND ${BASE_FILTERING_TESTS}
- itktubeAnisotropicHybridDiffusionImageFilterTest
- MIDAS{CroppedWholeLungCTScan.mhd.md5}
- ${TEMP}/CroppedWholeLungCTScanHybridDiffused.mha
- MIDAS_FETCH_ONLY{CroppedWholeLungCTScan.raw.md5} )
+   itktubeAnisotropicHybridDiffusionImageFilterTest
+     MIDAS{CroppedWholeLungCTScan.mhd.md5}
+     ${TEMP}/CroppedWholeLungCTScanHybridDiffused.mha
+     MIDAS_FETCH_ONLY{CroppedWholeLungCTScan.raw.md5} )
 
 Midas3FunctionAddTest( NAME itktubeAnisotropicCoherenceEnhancingDiffusionImageFilterTest
  COMMAND ${BASE_FILTERING_TESTS}
- itktubeAnisotropicCoherenceEnhancingDiffusionImageFilterTest
- MIDAS{CroppedWholeLungCTScan.mhd.md5}
- ${TEMP}/CroppedWholeLungCTCoherenceEnhanced.mha
- MIDAS_FETCH_ONLY{CroppedWholeLungCTScan.raw.md5} )
+   itktubeAnisotropicCoherenceEnhancingDiffusionImageFilterTest
+     MIDAS{CroppedWholeLungCTScan.mhd.md5}
+     ${TEMP}/CroppedWholeLungCTCoherenceEnhanced.mha
+     MIDAS_FETCH_ONLY{CroppedWholeLungCTScan.raw.md5} )
 
 Midas3FunctionAddTest( NAME itktubeAnisotropicEdgeEnhancementDiffusionImageFilterTest
  COMMAND ${BASE_FILTERING_TESTS}
- itktubeAnisotropicEdgeEnhancementDiffusionImageFilterTest
- MIDAS{CroppedWholeLungCTScan.mhd.md5}
- ${TEMP}/CroppedWholeLungCTEdgeEnhanced.mha
- MIDAS_FETCH_ONLY{CroppedWholeLungCTScan.raw.md5} )
+   itktubeAnisotropicEdgeEnhancementDiffusionImageFilterTest
+     MIDAS{CroppedWholeLungCTScan.mhd.md5}
+     ${TEMP}/CroppedWholeLungCTEdgeEnhanced.mha
+     MIDAS_FETCH_ONLY{CroppedWholeLungCTScan.raw.md5} )
+
+add_test( NAME itktubeTortuositySpatialObjectFilterTest
+  COMMAND ${BASE_FILTERING_TESTS}
+    itktubeTortuositySpatialObjectFilterTest )

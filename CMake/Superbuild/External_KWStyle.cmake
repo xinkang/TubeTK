@@ -21,32 +21,29 @@
 #
 ##############################################################################
 
-# Make sure this file is included only once.
-get_filename_component( CMAKE_CURRENT_LIST_FILENAME ${CMAKE_CURRENT_LIST_FILE}
-  NAME_WE )
-if( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-  return()
-endif( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-set( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED 1 )
-
 set( proj KWStyle )
 
 # Sanity checks.
-if( KWSTYLE_EXECUTABLE AND NOT EXISTS ${KWSTYLE_EXECUTABLE} )
-  message( FATAL_ERROR "The KWSTYLE_EXECUTABLE variable is defined, but corresponds to a nonexistent file" )
-endif( KWSTYLE_EXECUTABLE AND NOT EXISTS ${KWSTYLE_EXECUTABLE} )
+if( KWStyle_DIR AND NOT EXISTS ${KWStyle_DIR} )
+  message( FATAL_ERROR
+    "KWStyle_DIR is defined, but corresponds to a nonexistent file" )
+endif( KWStyle_DIR AND NOT EXISTS ${KWStyle_DIR} )
 
 set( ${proj}_DEPENDENCIES "" )
 
 # Include dependent projects, if any.
-TubeTKMacroCheckExternalProjectDependency( ${proj} )
+ExternalProject_Include_Dependencies( ${proj}
+  PROJECT_VAR proj
+  DEPENDS_VAR ${proj}_DEPENDENCIES
+  USE_SYSTEM_VAR USE_SYSTEM_${proj}
+  SUPERBUILD_VAR TubeTK_USE_SUPERBUILD )
 
-if( NOT KWSTYLE_EXECUTABLE AND NOT ${USE_SYSTEM_KWSTYLE} )
+if( NOT KWStyle_DIR AND NOT ${USE_SYSTEM_KWSTYLE} )
   set( ${proj}_SOURCE_DIR ${CMAKE_BINARY_DIR}/${proj} )
   set( ${proj}_DIR ${CMAKE_BINARY_DIR}/${proj}-build )
-  set( KWSTYLE_EXECUTABLE ${${proj}_DIR}/bin/KWStyle )
 
   ExternalProject_Add( ${proj}
+    ${${proj}_EP_ARGS}
     GIT_REPOSITORY ${${proj}_URL}
     GIT_TAG ${${proj}_HASH_OR_TAG}
     DOWNLOAD_DIR ${${proj}_SOURCE_DIR}
@@ -71,12 +68,19 @@ if( NOT KWSTYLE_EXECUTABLE AND NOT ${USE_SYSTEM_KWSTYLE} )
     DEPENDS
       ${${proj}_DEPENDENCIES} )
 
-else( NOT KWSTYLE_EXECUTABLE AND NOT ${USE_SYSTEM_KWSTYLE} )
-  if( ${USE_SYSTEM_KWSTYLE} )
-    find_package( ${proj} REQUIRED )
-  endif( ${USE_SYSTEM_KWSTYLE} )
+else( NOT KWStyle_DIR AND NOT ${USE_SYSTEM_KWSTYLE} )
 
-  TubeTKMacroEmptyExternalProject( ${proj} "${${proj}_DEPENDENCIES}" )
-endif( NOT KWSTYLE_EXECUTABLE AND NOT ${USE_SYSTEM_KWSTYLE} )
+  find_program( KWSTYLE_EXECUTABLE NAMES KWStyle
+    PATHS /usr/local/bin
+    /usr/bin
+    ${KWStyle_DIR}/bin
+    ${KWStyle_DIR}/bin/Release
+    ${KWStyle_DIR}/bin/MinSizeRel
+    ${KWStyle_DIR}/bin/RelWithDebInfo
+    ${KWStyle_DIR}/bin/Debug )
+  mark_as_advanced( KWSTYLE_EXECUTABLE )
 
-list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS -DKWSTYLE_EXECUTABLE:FILEPATH=${KWSTYLE_EXECUTABLE} )
+  ExternalProject_Add_Empty( ${proj} DEPENDS ${${proj}_DEPENDENCIES} )
+endif( NOT KWStyle_DIR AND NOT ${USE_SYSTEM_KWSTYLE} )
+
+list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS -DKWStyle_DIR:FILEPATH=${KWStyle_DIR} )

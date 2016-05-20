@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<executable>
+  <category>TubeTK</category>
+  <title>Minimal Path Extraction (TubeTK)</title>
+  <description>Extract the minimal path on an image</description>
+  <version>0.1.0.$Revision: 2015 $(alpha)</version>
+  <documentation-url>http://public.kitware.com/Wiki/TubeTK</documentation-url>
+  <license>Apache 2.0</license>
+  <contributor>Lucas Gandel (Kitware)</contributor>
+  <acknowledgements>This work is part of the TubeTK project at Kitware.</acknowledgements>
+  <parameters>
+    <label>IO</label>
+    <description>Input/output parameters.</description>
+    <image>
+      <name>InputImage</name>
+      <label>Input Image</label>
+      <channel>input</channel>
+      <index>0</index>
+      <description>Input image to compute minimal path</description>
+    </image>
+    <file>
+      <name>OutputTREFile</name>
+      <label>Output TRE File</label>
+      <channel>input</channel>
+      <index>1</index>
+      <description>Output tubes centered along the path </description>
+    </file>
+  </parameters>
+  <parameters>
+    <label>Path</label>
+    <description>Path parameters.</description>
+    <point multiple="true" coordinateSystem="lps">
+      <name>Path</name>
+      <label>Path Points</label>
+      <description>Path Points</description>
+      <longflag>pathPoints</longflag>
+    </point>
+    <file>
+      <name>InputPathFile</name>
+      <label>Target Path </label>
+      <longflag>targetPath</longflag>
+      <channel>input</channel>
+      <description>Starting from the path points, a new path is extracted to grow and meet the target path. </description>
+    </file>
+    <boolean>
+      <name>HardBoundary</name>
+      <label>Hard boundary</label>
+      <description>Indicates wether to stop extracting new path as it approach with in the boundary of the target path. </description>
+      <default>false</default>
+      <longflag>strictBoundary</longflag>
+    </boolean>
+    <double>
+      <name>Distance</name>
+      <label>Boundary Distance</label>
+      <description>Distance between the new path and the target path</description>
+      <longflag>distance</longflag>
+      <default>-1</default>
+      <constraints>
+        <minimum>-1</minimum>
+        <maximum>50</maximum>
+        <step>1</step>
+      </constraints>
+    </double>
+    <file fileExtensions=".fcsv">
+      <name>PathEndPoints</name>
+      <label>Path End Points File</label>
+      <channel>input</channel>
+      <description>Save the end points of the extracted path.</description>
+      <longflag>endPointsFile</longflag>
+    </file>
+  </parameters>
+  <parameters>
+    <label>Radius Extraction</label>
+    <boolean>
+      <name>ExtractRadiusUsingInputImage</name>
+      <label>Extract Radius Using Input Image</label>
+      <description>Extract tube radius along the path using input image. To be used when input image is a distance map.</description>
+      <default>false</default>
+      <longflag>extractRadiusFromDistanceMap</longflag>
+    </boolean>
+    <image>
+      <name>RadiusImage</name>
+      <label>Radius Image</label>
+      <longflag>radiusImage</longflag>
+      <flag>R</flag>
+      <description>Original Image to extract radius</description>
+      <channel>input</channel>
+      <default></default>
+    </image>
+    <double>
+      <name>StartRadius</name>
+      <label>Start Radius</label>
+      <description>Start Radius for radius estimation.</description>
+      <longflag>startRadius</longflag>
+      <default>1</default>
+    </double>
+    <double>
+      <name>MaxRadius</name>
+      <label>Radius Maximum Limit</label>
+      <description>Maximum Radius for radius estimation.</description>
+      <longflag>maxRadius</longflag>
+      <default>6</default>
+    </double>
+    <double>
+      <name>StepRadius</name>
+      <label>Step size for radius estimation</label>
+      <description>Step size for radius estimation.</description>
+      <longflag>stepRadius</longflag>
+      <default>0.05</default>
+    </double>
+  </parameters>
+  <parameters advanced="true">
+    <label>Algorithm Parameters</label>
+    <string-enumeration>
+      <name>Optimizer</name>
+      <label>Optimizer</label>
+      <description>Optimizer to extract path</description>
+      <longflag>optimizer</longflag>
+      <default>Regular_Step_Gradient_Descent</default>
+      <element>Gradient_Descent</element>
+      <element>Iterate_Neighborhood</element>
+      <element>Regular_Step_Gradient_Descent</element>
+    </string-enumeration>
+    <double>
+      <name>TerminationValue</name>
+      <label>Termination Value</label>
+      <description>Minimum value to reach before Optimizer is terminated</description>
+      <longflag>terminationValue</longflag>
+      <default>2.0</default>
+    </double>
+    <integer>
+      <name>NumberOfIterations</name>
+      <label>Number of Iterations</label>
+      <description>Maximum number of optimizer iterations. Only used with Gradient Descent and Regular Step Gradient Descent optimizers</description>
+      <longflag>numberOfIterations</longflag>
+      <default>2000</default>
+    </integer>
+    <double>
+      <name>StepLengthFactor</name>
+      <label>Step Length Factor</label>
+      <description>Optimizer Step Size factor. Only used with Iterate Neighborhood and Regular Step Gradient Descent optimizers</description>
+      <longflag>stepLengthFactor</longflag>
+      <default>0.1</default>
+    </double>
+    <double>
+      <name>StepLengthRelax</name>
+      <label>Step Length Relax</label>
+      <description>Set Relaxation Factor. Only used with Regular Step Gradient Descent optimizer</description>
+      <longflag>stepLengthRelax</longflag>
+      <default>0.999</default>
+    </double>
+  </parameters>
+</executable>

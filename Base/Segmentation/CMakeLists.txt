@@ -23,33 +23,56 @@
 
 project( TubeTKSegmentation )
 
+if( TubeTK_USE_LIBSVM )
+  find_package( LIBSVM )
+  include_directories( ${LIBSVM_INCLUDE_DIRS} )
+endif( TubeTK_USE_LIBSVM )
+
 set( TubeTK_Base_Segmentation_H_Files
-  itktubeCVTImageFilter.h
-  itktubeLabelOverlapMeasuresImageFilter.h
-  itktubePDFSegmenter.h
-  itktubeRadiusExtractor.h
+  itktubePDFSegmenterBase.h
+  itktubePDFSegmenterParzen.h
+  itktubeRadiusExtractor2.h
   itktubeRidgeExtractor.h
-  itktubeRidgeSeedFilter.h
   itktubeTubeExtractor.h )
+if( TubeTK_USE_LIBSVM )
+  list( APPEND TubeTK_Base_Segmentation_H_Files
+    itktubePDFSegmenterSVM.h
+    itktubeRidgeSeedFilter.h )
+endif( TubeTK_USE_LIBSVM )
 
 set( TubeTK_Base_Segmentation_HXX_Files
-  itktubeCVTImageFilter.hxx
-  itktubeLabelOverlapMeasuresImageFilter.hxx
-  itktubePDFSegmenter.hxx
-  itktubeRadiusExtractor.hxx
+  itktubePDFSegmenterBase.hxx
+  itktubePDFSegmenterParzen.hxx
+  itktubeRadiusExtractor2.hxx
   itktubeRidgeExtractor.hxx
-  itktubeRidgeSeedFilter.hxx
   itktubeTubeExtractor.hxx )
+if( TubeTK_USE_LIBSVM )
+  list( APPEND TubeTK_Base_Segmentation_HXX_Files
+    itktubePDFSegmenterSVM.hxx
+    itktubeRidgeSeedFilter.hxx )
+endif( TubeTK_USE_LIBSVM )
 
-add_custom_target( TubeTKSegmentation SOURCES
-  ${TubeTK_Base_Segmentation_H_Files}
-  ${TubeTK_Base_Segmentation_HXX_Files} )
+add_library( ${PROJECT_NAME} INTERFACE )
 
-if( BUILD_TESTING )
+target_include_directories( ${PROJECT_NAME} INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR} )
+
+target_link_libraries( ${PROJECT_NAME} INTERFACE
+   TubeTKFiltering
+   TubeTKNumerics )
+
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
 
-install( FILES
-  ${TubeTK_Base_Segmentation_H_Files}
-  ${TubeTK_Base_Segmentation_HXX_Files}
-  DESTINATION include )
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_Segmentation_H_Files}
+    ${TubeTK_Base_Segmentation_HXX_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
+
+  TubeTKMacroInstallPlugins( ${PROJECT_NAME} )
+endif()
+
+set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS ${PROJECT_NAME} )

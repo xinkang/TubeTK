@@ -33,19 +33,17 @@ find_package( SlicerExecutionModel REQUIRED )
 include( ${SlicerExecutionModel_USE_FILE} )
 
 find_package( ITK REQUIRED )
+if( TubeTK_BUILD_WITHIN_SLICER )
+  set( ITK_NO_IO_FACTORY_REGISTER_MANAGER 1 )
+endif( TubeTK_BUILD_WITHIN_SLICER )
 include( ${ITK_USE_FILE} )
 
 SEMMacroBuildCLI(
   NAME ${MODULE_NAME}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
-  TARGET_LIBRARIES ${ITK_LIBRARIES} TubeTKNumerics TubeTKIO TubeTKCommon
-  INCLUDE_DIRECTORIES
-    ${TubeTK_SOURCE_DIR}/Base/IO
-    ${TubeTK_SOURCE_DIR}/Base/CLI
-    ${TubeTK_SOURCE_DIR}/Base/Common
-    ${TubeTK_SOURCE_DIR}/Base/Segmentation
-    ${TubeTK_SOURCE_DIR}/Base/Numerics
-    ${TubeTK_SOURCE_DIR}/Base/Filtering )
+  TARGET_LIBRARIES
+    ${ITK_LIBRARIES} ITKIOMeta
+    TubeCLI TubeTKCommon TubeTKIO TubeTKSegmentation )
 
 if( BUILD_TESTING )
   add_subdirectory( Testing )

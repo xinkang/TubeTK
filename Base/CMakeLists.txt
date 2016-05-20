@@ -20,22 +20,36 @@
 # limitations under the License.
 #
 ##############################################################################
+macro( _subdirectory_conditional_add name )
+  if( NOT DEFINED TubeTK_BUILD_BASE_${name} )
+    set( TubeTK_BUILD_BASE_${name} 1 )
+    if( ITK_SOURCE_DIR )
+      # TubeTK base libraries required by TubeTKITK module will have
+      # to be explicitly enabled.
+      set( TubeTK_BUILD_BASE_${name} 0 )
+    endif()
+  endif()
+  if( TubeTK_BUILD_BASE_${name} )
+    add_subdirectory( ${name} )
+  endif()
+endmacro()
 
-add_subdirectory( CLI )
-add_subdirectory( Common )
-add_subdirectory( Filtering )
-add_subdirectory( IO )
-add_subdirectory( Numerics )
-add_subdirectory( ObjectDocuments )
+if( ITK_SOURCE_DIR )
+  include("../CMake/TubeTKMacroInstallPlugins.cmake")
+endif()
 
-#if( ParameterSerializer_FOUND )
-  #add_subdirectory( ParameterSerializer )
-#endif( ParameterSerializer_FOUND )
+_subdirectory_conditional_add( CLI )
+_subdirectory_conditional_add( Common )
+_subdirectory_conditional_add( CompareTools )
+_subdirectory_conditional_add( Numerics )
+_subdirectory_conditional_add( IO )
+_subdirectory_conditional_add( ObjectDocuments )
 
 if( TubeTK_USE_PYTHON )
-  add_subdirectory( Python )
+  _subdirectory_conditional_add( Python )
 endif( TubeTK_USE_PYTHON )
 
-add_subdirectory( Registration )
-add_subdirectory( Segmentation )
-add_subdirectory( USTK )
+_subdirectory_conditional_add( Filtering )
+_subdirectory_conditional_add( Registration )
+_subdirectory_conditional_add( Segmentation )
+_subdirectory_conditional_add( USTK )

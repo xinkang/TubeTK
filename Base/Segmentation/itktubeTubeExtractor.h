@@ -29,7 +29,7 @@ limitations under the License.
 #ifndef __itktubeTubeExtractor_h
 #define __itktubeTubeExtractor_h
 
-#include "itktubeRadiusExtractor.h"
+#include "itktubeRadiusExtractor2.h"
 #include "itktubeRidgeExtractor.h"
 
 #include "itkGroupSpatialObject.h"
@@ -90,7 +90,7 @@ public:
   typedef itk::GroupSpatialObject< ImageDimension >     TubeGroupType;
 
   typedef RidgeExtractor<ImageType>                     RidgeOpType;
-  typedef RadiusExtractor<ImageType>                    RadiusOpType;
+  typedef RadiusExtractor2<ImageType>                   RadiusOpType;
 
   /**
    * Type definition for the input image pixel type. */
@@ -108,11 +108,19 @@ public:
   void SetInputImage( typename ImageType::Pointer inputImage );
 
   /**
+   * Optionally set a different input image to use for radius estimation */
+  void SetRadiusInputImage( typename ImageType::Pointer radiusInputImage );
+
+  /**
    * Get the input image */
   itkGetConstObjectMacro( InputImage, ImageType );
 
   /**
-   * Get the input image */
+   * Set the tube mask image */
+  void SetTubeMaskImage( typename TubeMaskImageType::Pointer & mask );
+
+  /**
+   * Get the tube mask image */
   typename TubeMaskImageType::Pointer GetTubeMaskImage( void );
 
   /**
@@ -133,7 +141,7 @@ public:
 
   /**
    * Set ExtractBound Minimum */
-  void SetExtractBoundMin( IndexType dataMin );
+  void SetExtractBoundMin( const IndexType & dataMin );
 
   /**
    * Get ExtractBound Minimum */
@@ -141,7 +149,7 @@ public:
 
   /**
    * Set ExtractBound Maximum */
-  void SetExtractBoundMax( IndexType dataMax );
+  void SetExtractBoundMax( const IndexType & dataMax );
 
   /**
    * Get ExtractBound Maximum */
@@ -156,20 +164,12 @@ public:
   double GetRadius( void );
 
   /**
-   * Set Extract Ridge */
-  void ExtractBrightTube( bool extractRidge );
-
-  /**
-   * Get Extract Ridge */
-  bool ExtractBrightTube( void );
-
-  /**
    * Get the ridge extractor */
   typename RidgeExtractor<ImageType>::Pointer GetRidgeOp( void );
 
   /**
    * Get the radius extractor */
-  typename RadiusExtractor<ImageType>::Pointer GetRadiusOp( void );
+  typename RadiusExtractor2<ImageType>::Pointer GetRadiusOp( void );
 
   /**
    * Return true if a tube is found from the given seed point */
@@ -179,7 +179,8 @@ public:
    * Extract the ND tube given the position of the first point
    * and the tube ID */
   typename TubeType::Pointer ExtractTube( const ContinuousIndexType & x,
-    unsigned int tubeID );
+    unsigned int tubeID,
+    bool verbose=false );
 
   /**
    * Get the list of tubes that have been extracted */
@@ -203,11 +204,11 @@ public:
 
   /**
    * Set the tube color */
-  void SetColor( float color[4] );
+  void SetTubeColor( const vnl_vector< double > & color );
 
   /**
    * Get the tube color */
-  itkGetMacro( Color, float * );
+  vnl_vector<double> & GetTubeColor( void );
 
   /**
    * Set the idle callback */
@@ -233,8 +234,8 @@ protected:
 
   void PrintSelf( std::ostream & os, Indent indent ) const;
 
-  typename RidgeExtractor<ImageType>::Pointer  m_RidgeOp;
-  typename RadiusExtractor<ImageType>::Pointer m_RadiusOp;
+  typename RidgeExtractor<ImageType>::Pointer   m_RidgeOp;
+  typename RadiusExtractor2<ImageType>::Pointer m_RadiusOp;
 
   bool ( *m_IdleCallBack )( void );
   void ( *m_StatusCallBack )( const char *, const char *, int );
@@ -248,7 +249,9 @@ private:
 
   typename ImageType::Pointer       m_InputImage;
 
-  float                             m_Color[4];
+  typename ImageType::Pointer       m_RadiusInputImage;
+
+  vnl_vector<double>                m_TubeColor;
 
   typename TubeGroupType::Pointer   m_TubeGroup;
 

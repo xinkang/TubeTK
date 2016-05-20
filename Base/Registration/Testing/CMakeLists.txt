@@ -27,17 +27,17 @@ include( Midas3FunctionAddTest )
 set( MIDAS_REST_URL http://midas3.kitware.com/midas/api/rest )
 set( MIDAS_KEY_DIR ${TubeTK_SOURCE_DIR}/MIDAS_Keys )
 
-find_package( ITK REQUIRED )
-include( ${ITK_USE_FILE} )
-
 find_package( SlicerExecutionModel REQUIRED )
 include( ${SlicerExecutionModel_USE_FILE} )
+
+find_package( ITK REQUIRED )
+include( ${ITK_USE_FILE} )
 
 set( BASE_REGISTRATION_TESTS
   ${TubeTK_LAUNCHER} $<TARGET_FILE:tubeBaseRegistrationTests> )
 
-set( IMAGECOMPARE_EXE
-  ${TubeTK_LAUNCHER} $<TARGET_FILE:ImageCompareCommand> )
+set( CompareImages_EXE
+  ${TubeTK_LAUNCHER} $<TARGET_FILE:CompareImages> )
 
 set( TEMP ${TubeTK_BINARY_DIR}/Temporary )
 
@@ -56,8 +56,9 @@ set( tubeBaseRegistration_SRCS
   itktubeTubeToTubeTransformFilterTest.cxx )
 
 # give a bit of tolerance
-set( imageCompareTolerance 0.000001 )
+set( CompareImagesTolerance 0.000001 )
 
+set( tubeBaseRegistration_ADDITIONAL_LIBRARIES )
 if( TubeTK_USE_VTK )
   find_package( VTK REQUIRED )
   include( ${VTK_USE_FILE} )
@@ -66,7 +67,15 @@ if( TubeTK_USE_VTK )
     ${tubeBaseRegistration_SRCS}
     itktubeAnisotropicDiffusiveRegistrationGenerateTestingImages.cxx
     itktubeAnisotropicDiffusiveRegistrationRegularizationTest.cxx )
+
+  set( tubeBaseRegistration_ADDITIONAL_LIBRARIES
+    ${VTK_LIBRARIES} )
 endif( TubeTK_USE_VTK )
+
+set( no_install_option )
+if( NOT TubeTK_INSTALL_DEVELOPMENT )
+  set( no_install_option NO_INSTALL )
+endif()
 
 SEMMacroBuildCLI(
   NAME tubeBaseRegistrationTests
@@ -74,93 +83,79 @@ SEMMacroBuildCLI(
     ${tubeBaseRegistration_SRCS}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
   TARGET_LIBRARIES
-    ${ITK_LIBRARIES}
-    ${VTK_LIBRARIES}
-  INCLUDE_DIRECTORIES
-    ${TubeTK_SOURCE_DIR}/Base/CLI
-    ${TubeTK_SOURCE_DIR}/Base/Common
-    ${TubeTK_SOURCE_DIR}/Base/Filtering
-    ${TubeTK_SOURCE_DIR}/Base/Numerics
-    ${TubeTK_SOURCE_DIR}/Base/Registration
-  INSTALL_RUNTIME_DESTINATION lib
-  INSTALL_LIBRARY_DESTINATION lib
-  INSTALL_ARCHIVE_DESTINATION bin
+    TubeCLI TubeTKFiltering TubeTKRegistration
+    ${ITK_LIBRARIES} ITKIOMeta ITKIOSpatialObjects ITKOptimizers
+    ${tubeBaseRegistration_ADDITIONAL_LIBRARIES}
   EXECUTABLE_ONLY
+  ${no_install_option}
   )
 
 if( TubeTK_USE_VTK )
   add_definitions( -DTubeTK_USE_VTK )
 endif( TubeTK_USE_VTK )
 
-set( tubeBaseRegistration_LIBS
-  tubeBaseRegistrationTests
-  ${ITK_LIBRARIES} )
-
-if( TubeTK_USE_VTK )
-  set( tubeBaseRegistration_LIBS
-    ${tubeBaseRegistration_LIBS}
-    ${VTK_LIBRARIES} )
-endif( TubeTK_USE_VTK )
-target_link_libraries( ${tubeBaseRegistration_LIBS} )
-
 Midas3FunctionAddTest( NAME itktubeTubeToTubeTransformFilterTest
   COMMAND ${BASE_REGISTRATION_TESTS}
-  itktubeTubeToTubeTransformFilterTest
-  MIDAS{Branch-truth-new.tre.md5}
-  ${TEMP}/itkTubeToTubeTransformFilter.tre
-  MIDAS{Branch.n020.mha.md5}
-  ${TEMP}/itkTubeToTubeTransformFilter.mha
-  0.2 0.1 0.1 5 -5 5
-  0 )
+    --compare
+      MIDAS{itktubeTubeToTubeTransformFilter.mha.md5}
+      ${TEMP}/itktubeTubeToTubeTransformFilter.mha
+    itktubeTubeToTubeTransformFilterTest
+      MIDAS{Branch-truth-new.tre.md5}
+      ${TEMP}/itktubeTubeToTubeTransformFilter.tre
+      MIDAS{Branch.n020.mha.md5}
+      ${TEMP}/itktubeTubeToTubeTransformFilter.mha
+      0.2 0.1 0.1 5 -5 5
+      1 )
 
 Midas3FunctionAddTest( NAME itktubeImageToTubeRigidRegistrationTest
   COMMAND ${BASE_REGISTRATION_TESTS}
-  itktubeImageToTubeRigidRegistrationTest
-  MIDAS{Branch.n020.mha.md5}
-  MIDAS{tube.tre.md5}
-  ${TEMP}/itkTubeImageToTubeRigidRegistrationOutputTube.tre
-  ${TEMP}/itkTubeImageToTubeRigidRegistrationOutputImage.mha )
+    itktubeImageToTubeRigidRegistrationTest
+      MIDAS{Branch.n020.mha.md5}
+      MIDAS{tube.tre.md5}
+      ${TEMP}/itktubeImageToTubeRigidRegistrationOutputTube.tre
+      ${TEMP}/itktubeImageToTubeRigidRegistrationOutputImage.mha )
 
 Midas3FunctionAddTest( NAME itktubeImageToTubeRigidRegistrationPerformanceTest
   COMMAND ${BASE_REGISTRATION_TESTS}
-  itktubeImageToTubeRigidRegistrationPerformanceTest
-  MIDAS{Branch.n020.mha.md5}
-  MIDAS{Branch-truth-new.tre.md5}
-  ${TEMP}/itkTubeImageToTubeRigidRegistrationPerformance )
+    itktubeImageToTubeRigidRegistrationPerformanceTest
+      MIDAS{Branch.n020.mha.md5}
+      MIDAS{Branch-truth-new.tre.md5}
+      ${TEMP}/itktubeImageToTubeRigidRegistrationPerformance )
 
 if( TubeTK_USE_VTK )
-  Midas3FunctionAddTest(
-    NAME itkAnisotropicDiffusiveRegistrationRegularizationTestStraightNoNoise
+  Midas3FunctionAddTest( NAME
+    itkAnisotropicDiffusiveRegistrationRegularizationTestStraightNoNoise
     COMMAND ${BASE_REGISTRATION_TESTS}
-    itkAnisotropicDiffusiveRegistrationRegularizationTest
-    ${TEMP}/Regularization_straight_noNoise_smoothedMotionField.mhd
-    0 0
-    5 0.125 1 )
-  Midas3FunctionAddTest(
-    NAME itkAnisotropicDiffusiveRegistrationRegularizationTestStraightNoNoise-Compare
-    COMMAND ${IMAGECOMPARE_EXE}
-    -t ${TEMP}/Regularization_straight_noNoise_smoothedMotionField.mhd
-    -b MIDAS{Regularization_straight_noNoise_smoothedMotionField.mhd.md5}
-    -i ${imageCompareTolerance}
-    MIDAS_FETCH_ONLY{Regularization_straight_noNoise_smoothedMotionField.zraw.md5} )
+      itkAnisotropicDiffusiveRegistrationRegularizationTest
+        ${TEMP}/Regularization_straight_noNoise_smoothedMotionField.mhd
+        0 0
+        5 0.125 1 )
+  Midas3FunctionAddTest( NAME
+    itkAnisotropicDiffusiveRegistrationRegularizationTestStraightNoNoise-Compare
+    COMMAND ${CompareImages_EXE}
+      -t ${TEMP}/Regularization_straight_noNoise_smoothedMotionField.mhd
+      -b MIDAS{Regularization_straight_noNoise_smoothedMotionField.mhd.md5}
+      -i ${CompareImagesTolerance}
+      MIDAS_FETCH_ONLY{Regularization_straight_noNoise_smoothedMotionField.zraw.md5} )
   set_property( TEST
     itkAnisotropicDiffusiveRegistrationRegularizationTestStraightNoNoise-Compare
     APPEND PROPERTY DEPENDS
     itkAnisotropicDiffusiveRegistrationRegularizationTestStraightNoNoise )
 
-  Midas3FunctionAddTest( NAME itkAnisotropicDiffusiveRegistrationRegularizationTestStraight
+  Midas3FunctionAddTest( NAME
+      itkAnisotropicDiffusiveRegistrationRegularizationTestStraight
     COMMAND ${BASE_REGISTRATION_TESTS}
-    itkAnisotropicDiffusiveRegistrationRegularizationTest
-    ${TEMP}/Regularization_straight_smoothedMotionField.mhd
-    0.1 0
-    5 0.125 1 )
+      itkAnisotropicDiffusiveRegistrationRegularizationTest
+        ${TEMP}/Regularization_straight_smoothedMotionField.mhd
+        0.1 0
+        5 0.125 1 )
   Midas3FunctionAddTest(
     NAME itkAnisotropicDiffusiveRegistrationRegularizationTestStraight-Compare
-    COMMAND ${IMAGECOMPARE_EXE}
-    -t ${TEMP}/Regularization_straight_smoothedMotionField.mhd
-    -b MIDAS{Regularization_straight_smoothedMotionField.mhd.md5}
-    -i ${imageCompareTolerance}
-    MIDAS_FETCH_ONLY{Regularization_straight_smoothedMotionField.zraw.md5} )
+    COMMAND ${CompareImages_EXE}
+      -t ${TEMP}/Regularization_straight_smoothedMotionField.mhd
+      -b MIDAS{Regularization_straight_smoothedMotionField.mhd.md5}
+      -i ${CompareImagesTolerance}
+      MIDAS_FETCH_ONLY{Regularization_straight_smoothedMotionField.zraw.md5} )
   set_property( TEST
     itkAnisotropicDiffusiveRegistrationRegularizationTestStraight-Compare
     APPEND PROPERTY DEPENDS
@@ -169,35 +164,36 @@ if( TubeTK_USE_VTK )
   Midas3FunctionAddTest(
     NAME itkAnisotropicDiffusiveRegistrationRegularizationTestAngledNoNoise
     COMMAND ${BASE_REGISTRATION_TESTS}
-    itkAnisotropicDiffusiveRegistrationRegularizationTest
-    ${TEMP}/Regularization_angled_noNoise_smoothedMotionField.mhd
-    0 0.5
-    5 0.125 1 )
-  Midas3FunctionAddTest(
-    NAME itkAnisotropicDiffusiveRegistrationRegularizationTestAngledNoNoise-Compare
-    COMMAND ${IMAGECOMPARE_EXE}
-    -t ${TEMP}/Regularization_angled_noNoise_smoothedMotionField.mhd
-    -b MIDAS{Regularization_angled_noNoise_smoothedMotionField.mhd.md5}
-    -i ${imageCompareTolerance}
-    MIDAS_FETCH_ONLY{Regularization_angled_noNoise_smoothedMotionField.zraw.md5} )
+      itkAnisotropicDiffusiveRegistrationRegularizationTest
+        ${TEMP}/Regularization_angled_noNoise_smoothedMotionField.mhd
+        0 0.5
+        5 0.125 1 )
+  Midas3FunctionAddTest( NAME
+    itkAnisotropicDiffusiveRegistrationRegularizationTestAngledNoNoise-Compare
+    COMMAND ${CompareImages_EXE}
+      -t ${TEMP}/Regularization_angled_noNoise_smoothedMotionField.mhd
+      -b MIDAS{Regularization_angled_noNoise_smoothedMotionField.mhd.md5}
+      -i ${CompareImagesTolerance}
+      MIDAS_FETCH_ONLY{Regularization_angled_noNoise_smoothedMotionField.zraw.md5} )
   set_property( TEST
     itkAnisotropicDiffusiveRegistrationRegularizationTestAngledNoNoise-Compare
     APPEND PROPERTY DEPENDS
     itkAnisotropicDiffusiveRegistrationRegularizationTestAngledNoNoise )
 
-  Midas3FunctionAddTest( NAME itkAnisotropicDiffusiveRegistrationRegularizationTestAngled
+  Midas3FunctionAddTest( NAME
+      itkAnisotropicDiffusiveRegistrationRegularizationTestAngled
     COMMAND ${BASE_REGISTRATION_TESTS}
-    itkAnisotropicDiffusiveRegistrationRegularizationTest
-    ${TEMP}/Regularization_angled_smoothedMotionField.mhd
-    0.1 0.5
-    5 0.125 1 )
+      itkAnisotropicDiffusiveRegistrationRegularizationTest
+        ${TEMP}/Regularization_angled_smoothedMotionField.mhd
+        0.1 0.5
+        5 0.125 1 )
   Midas3FunctionAddTest(
     NAME itkAnisotropicDiffusiveRegistrationRegularizationTestAngled-Compare
-    COMMAND ${IMAGECOMPARE_EXE}
-    -t ${TEMP}/Regularization_angled_smoothedMotionField.mhd
-    -b MIDAS{Regularization_angled_smoothedMotionField.mhd.md5}
-    -i ${imageCompareTolerance}
-    MIDAS_FETCH_ONLY{Regularization_angled_smoothedMotionField.zraw.md5} )
+    COMMAND ${CompareImages_EXE}
+      -t ${TEMP}/Regularization_angled_smoothedMotionField.mhd
+      -b MIDAS{Regularization_angled_smoothedMotionField.mhd.md5}
+      -i ${CompareImagesTolerance}
+      MIDAS_FETCH_ONLY{Regularization_angled_smoothedMotionField.zraw.md5} )
   set_property( TEST
     itkAnisotropicDiffusiveRegistrationRegularizationTestAngled-Compare
     APPEND PROPERTY DEPENDS
@@ -206,17 +202,17 @@ if( TubeTK_USE_VTK )
   Midas3FunctionAddTest(
     NAME itkAnisotropicDiffusiveRegistrationRegularizationTestAngledGaussian
     COMMAND ${BASE_REGISTRATION_TESTS}
-    itkAnisotropicDiffusiveRegistrationRegularizationTest
-    ${TEMP}/Regularization_angled_gaussian_smoothedMotionField.mhd
-    0.1 0.5
-    5 0.125 0 )
-  Midas3FunctionAddTest(
-    NAME itkAnisotropicDiffusiveRegistrationRegularizationTestAngledGaussian-Compare
-    COMMAND ${IMAGECOMPARE_EXE}
-    -t ${TEMP}/Regularization_angled_gaussian_smoothedMotionField.mhd
-    -b MIDAS{Regularization_angled_gaussian_smoothedMotionField.mhd.md5}
-    -i ${imageCompareTolerance}
-    MIDAS_FETCH_ONLY{Regularization_angled_gaussian_smoothedMotionField.zraw.md5} )
+      itkAnisotropicDiffusiveRegistrationRegularizationTest
+        ${TEMP}/Regularization_angled_gaussian_smoothedMotionField.mhd
+        0.1 0.5
+        5 0.125 0 )
+  Midas3FunctionAddTest( NAME
+    itkAnisotropicDiffusiveRegistrationRegularizationTestAngledGaussian-Compare
+    COMMAND ${CompareImages_EXE}
+      -t ${TEMP}/Regularization_angled_gaussian_smoothedMotionField.mhd
+      -b MIDAS{Regularization_angled_gaussian_smoothedMotionField.mhd.md5}
+      -i ${CompareImagesTolerance}
+      MIDAS_FETCH_ONLY{Regularization_angled_gaussian_smoothedMotionField.zraw.md5} )
   set_property( TEST
     itkAnisotropicDiffusiveRegistrationRegularizationTestAngledGaussian-Compare
     APPEND PROPERTY DEPENDS
@@ -225,58 +221,65 @@ if( TubeTK_USE_VTK )
 endif( TubeTK_USE_VTK )
 
 Midas3FunctionAddTest( NAME itktubePointsToImageTest
-  COMMAND ${BASE_REGISTRATION_TESTS} itktubePointsToImageTest
-  MIDAS{Branch-truth-new.tre.md5}
-  ${TEMP}/Branch-truth-new-points.mha )
+  COMMAND ${BASE_REGISTRATION_TESTS}
+    itktubePointsToImageTest
+      MIDAS{Branch-truth-new.tre.md5}
+      ${TEMP}/Branch-truth-new-points.mha )
 
 Midas3FunctionAddTest( NAME itktubeImageToTubeRigidMetricTest1
-  COMMAND ${BASE_REGISTRATION_TESTS} itktubeImageToTubeRigidMetricTest
-  MIDAS{SyntheticVesselTubeImage.mha.md5}
-  MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
-  2.30028 )
+  COMMAND ${BASE_REGISTRATION_TESTS}
+    itktubeImageToTubeRigidMetricTest
+      MIDAS{SyntheticVesselTubeImage.mha.md5}
+      MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
+      2.30028 )
 
 Midas3FunctionAddTest( NAME itktubeImageToTubeRigidMetricTest2
-  COMMAND ${BASE_REGISTRATION_TESTS} itktubeImageToTubeRigidMetricTest
-  MIDAS{SyntheticTransformedVesselTubeImage.mha.md5}
-  MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
-  0.0739628 )
+  COMMAND ${BASE_REGISTRATION_TESTS}
+    itktubeImageToTubeRigidMetricTest
+      MIDAS{SyntheticTransformedVesselTubeImage.mha.md5}
+      MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
+      0.0739628 )
 
 Midas3FunctionAddTest( NAME itktubeImageToTubeRigidMetricPerformanceTest
-  COMMAND ${BASE_REGISTRATION_TESTS} itktubeImageToTubeRigidMetricPerformanceTest
-  MIDAS{SyntheticVesselTubeImage.mha.md5}
-  MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
-  ${TEMP}/itkImageToTubeRigidMetricPerformance.txt )
+  COMMAND ${BASE_REGISTRATION_TESTS}
+    itktubeImageToTubeRigidMetricPerformanceTest
+      MIDAS{SyntheticVesselTubeImage.mha.md5}
+      MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
+      ${TEMP}/itkImageToTubeRigidMetricPerformance.txt )
 
 Midas3FunctionAddTest( NAME itktubeSyntheticTubeImageGenerationTest
-  COMMAND ${BASE_REGISTRATION_TESTS} itktubeSyntheticTubeImageGenerationTest
-  ${TEMP}/SyntheticBlurredTubeImage.mha
-  ${TEMP}/SyntheticVesselTube.tre
-  ${TEMP}/SyntheticVesselTubeImage.mha
-  MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
-  ${TEMP}/SyntheticTransformedVesselTubeImage.mha )
+  COMMAND ${BASE_REGISTRATION_TESTS}
+    itktubeSyntheticTubeImageGenerationTest
+      ${TEMP}/SyntheticBlurredTubeImage.mha
+      ${TEMP}/SyntheticVesselTube.tre
+      ${TEMP}/SyntheticVesselTubeImage.mha
+      MIDAS{SyntheticVesselTubeManuallyModified.tre.md5}
+      ${TEMP}/SyntheticTransformedVesselTubeImage.mha )
 
 Midas3FunctionAddTest( NAME itktubeTubeExponentialResolutionWeightFunctionTest
   COMMAND ${BASE_REGISTRATION_TESTS}
-  itktubeTubeExponentialResolutionWeightFunctionTest
-  ${TEMP}/itkTubeExponentialResolutionWeightFunctionTest.csv )
+    itktubeTubeExponentialResolutionWeightFunctionTest
+      ${TEMP}/itktubeExponentialResolutionWeightFunctionTest.csv )
 
-Midas3FunctionAddTest( NAME itktubeTubeParametricExponentialResolutionWeightFunctionTest
-  COMMAND ${BASE_REGISTRATION_TESTS}
+Midas3FunctionAddTest( NAME
   itktubeTubeParametricExponentialResolutionWeightFunctionTest
-  ${TEMP}/itkTubeParametricExponentialResolutionWeightFunctionTest.csv )
-
-Midas3FunctionAddTest( NAME itktubeTubeParametricExponentialWithBoundsResolutionWeightFunctionTest
   COMMAND ${BASE_REGISTRATION_TESTS}
+    itktubeTubeParametricExponentialResolutionWeightFunctionTest
+      ${TEMP}/itktubeParametricExponentialResolutionWeightFunctionTest.csv )
+
+Midas3FunctionAddTest( NAME
   itktubeTubeParametricExponentialWithBoundsResolutionWeightFunctionTest
-  ${TEMP}/itkTubeParametricExponentialWithBoundsResolutionWeightFunctionTest.csv )
+  COMMAND ${BASE_REGISTRATION_TESTS}
+    itktubeTubeParametricExponentialWithBoundsResolutionWeightFunctionTest
+      ${TEMP}/itktubeParametricExponentialWithBoundsResolutionWeightFunctionTest.csv )
 
 Midas3FunctionAddTest( NAME itktubeTubePointWeightsCalculatorTest
   COMMAND ${BASE_REGISTRATION_TESTS}
-  itktubeTubePointWeightsCalculatorTest
-  ${TEMP}/itkTubePointWeightsCalculatorTest.csv )
+    itktubeTubePointWeightsCalculatorTest
+      ${TEMP}/itktubePointWeightsCalculatorTest.csv )
 
 Midas3FunctionAddTest( NAME itktubeTubeAngleOfIncidenceWeightFunctionTest
   COMMAND ${BASE_REGISTRATION_TESTS}
-  itktubeTubeAngleOfIncidenceWeightFunctionTest
-  MIDAS{AlmostMaxInhale01.vessels.tre.md5}
-  ${TEMP}/itkTubeAngleOfIncidenceWeightFunctionTest )
+    itktubeTubeAngleOfIncidenceWeightFunctionTest
+      MIDAS{AlmostMaxInhale01.vessels.tre.md5}
+      ${TEMP}/itktubeAngleOfIncidenceWeightFunctionTest )

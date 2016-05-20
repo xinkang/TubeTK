@@ -21,17 +21,23 @@ limitations under the License.
 
 =========================================================================*/
 
-#include "itktubeCVTImageFilter.h"
-#include "itktubeLabelOverlapMeasuresImageFilter.h"
-#include "itktubePDFSegmenter.h"
-#include "itktubeRadiusExtractor.h"
+#include "tubetkConfigure.h"
+
+#include "itktubePDFSegmenterBase.h"
+#include "itktubePDFSegmenterParzen.h"
+#ifdef TubeTK_USE_LIBSVM
+#  include "itktubePDFSegmenterSVM.h"
+#endif
+#include "itktubeRadiusExtractor2.h"
 #include "itktubeRidgeExtractor.h"
-#include "itktubeRidgeSeedFilter.h"
+#ifdef TubeTK_USE_LIBSVM
+#  include "itktubeRidgeSeedFilter.h"
+#endif
 #include "itktubeTubeExtractor.h"
 
 #include <iostream>
 
-int main ( int itkNotUsed( argc ), char * itkNotUsed( argv )[] )
+int main( int itkNotUsed( argc ), char * itkNotUsed( argv )[] )
 {
   return EXIT_SUCCESS;
 }

@@ -84,7 +84,7 @@ public:
   void         SetInputFeatureVectorGenerator( FeatureVectorGeneratorType
                  * fGen );
   typename FeatureVectorGenerator< TImage >::Pointer
-               GetInputFeatureVectorGenerator( void );
+                 GetInputFeatureVectorGenerator( void );
 
   itkSetObjectMacro( LabelMap, LabelMapType );
   itkGetObjectMacro( LabelMap, LabelMapType );
@@ -92,7 +92,7 @@ public:
   void         SetObjectId( ObjectIdType objectId );
   void         AddObjectId( ObjectIdType objectId );
   ObjectIdType GetObjectId( unsigned int num = 0 ) const;
-  unsigned     int GetNumberOfObjectIds( void ) const;
+  unsigned int GetNumberOfObjectIds( void ) const;
 
   ValueType    GetObjectMean( ObjectIdType objectId ) const;
   void         SetObjectMean( ObjectIdType objectId, ValueType val );
@@ -104,7 +104,12 @@ public:
   MatrixType   GetGlobalCovariance( void ) const;
   void         SetGlobalCovariance( MatrixType val );
 
-  unsigned     int    GetNumberOfBasis( void ) const;
+  void         SetNumberOfPCABasisToUseAsFeatures(
+                 unsigned int numBasisUsed );
+  unsigned int GetNumberOfPCABasisToUseAsFeatures( void ) const;
+  void         SetNumberOfLDABasisToUseAsFeatures(
+                 unsigned int numBasisUsed );
+  unsigned int GetNumberOfLDABasisToUseAsFeatures( void ) const;
 
   double       GetBasisValue( unsigned int basisNum ) const;
   VectorType   GetBasisVector( unsigned int basisNum ) const;
@@ -112,27 +117,32 @@ public:
   VectorType   GetBasisValues( void ) const;
 
   void         SetBasisValue( unsigned int basisNum, double value );
-  void         SetBasisVector( unsigned int basisNum, const VectorType & vec );
+  void         SetBasisVector( unsigned int basisNum,
+                 const VectorType & vec );
   void         SetBasisMatrix( const MatrixType & mat );
   void         SetBasisValues( const VectorType & values );
 
-  typename FeatureImageType::Pointer GetFeatureImage( unsigned int fNum ) const;
+  virtual typename FeatureImageType::Pointer GetFeatureImage(
+                                       unsigned int fNum ) const;
 
-  itkSetMacro( PerformLDA, bool );
-  itkGetMacro( PerformLDA, bool );
-  itkSetMacro( PerformPCA, bool );
-  itkGetMacro( PerformPCA, bool );
+  void   SetInputWhitenMeans( const ValueListType & means );
+  const  ValueListType & GetInputWhitenMeans( void ) const;
+  void   SetInputWhitenStdDevs( const ValueListType & stdDevs );
+  const  ValueListType & GetInputWhitenStdDevs( void ) const;
 
-  virtual void GenerateBasis( void );
+  void   SetOutputWhitenMeans( const ValueListType & means );
+  const  ValueListType & GetOutputWhitenMeans( void ) const;
+  void   SetOutputWhitenStdDevs( const ValueListType & stdDevs );
+  const  ValueListType & GetOutputWhitenStdDevs( void ) const;
 
-  void SetNumberOfBasisToUseAsFeatures( unsigned int numBasisUsed );
+  virtual void Update( void );
 
   virtual unsigned int      GetNumberOfFeatures( void ) const;
 
   virtual FeatureVectorType GetFeatureVector( const IndexType & indx ) const;
 
   virtual FeatureValueType  GetFeatureVectorValue( const IndexType & indx,
-    unsigned int fNum ) const;
+                              unsigned int fNum ) const;
 
 protected:
 
@@ -159,11 +169,8 @@ private:
   VectorType                      m_GlobalMean;
   MatrixType                      m_GlobalCovariance;
 
-  bool                            m_PerformLDA;
-  bool                            m_PerformPCA;
-
-  unsigned int                    m_NumberOfBasis;
-  unsigned int                    m_NumberOfBasisToUseAsFeatures;
+  unsigned int                    m_NumberOfPCABasisToUseAsFeatures;
+  unsigned int                    m_NumberOfLDABasisToUseAsFeatures;
 
   MatrixType                      m_BasisMatrix;
   VectorType                      m_BasisValues;

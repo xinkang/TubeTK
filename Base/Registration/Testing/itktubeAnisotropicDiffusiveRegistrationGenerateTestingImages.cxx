@@ -31,6 +31,7 @@ limitations under the License.
 #include <vtkPolyDataNormals.h>
 #include <vtkPolyDataWriter.h>
 #include <vtkSphereSource.h>
+#include <vtkVersion.h>
 
 // Template function to fill in an image with a sphere.
 template< class TImage >
@@ -148,7 +149,7 @@ bool PointInTube( TIndex index, double * tubeLeftPoint, double radius)
     distance += vnl_math_sqr(index[i] - centerPoint[i]);
     }
 
-  return vcl_sqrt(distance) <= radius;
+  return std::sqrt(distance) <= radius;
 }
 
 // Template function to fill in an image with two tubes

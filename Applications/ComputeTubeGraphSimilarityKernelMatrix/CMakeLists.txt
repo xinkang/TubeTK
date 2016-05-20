@@ -41,17 +41,22 @@ find_package( SlicerExecutionModel REQUIRED )
 include( ${SlicerExecutionModel_USE_FILE} )
 
 find_package( ITK REQUIRED )
+if( TubeTK_BUILD_WITHIN_SLICER )
+  set( ITK_NO_IO_FACTORY_REGISTER_MANAGER 1 )
+endif( TubeTK_BUILD_WITHIN_SLICER )
 include( ${ITK_USE_FILE} )
 
 # Find Boost
 set( Boost_ADDITIONAL_VERSIONS "1.51 1.52 1.53 1.54" )
 set( Boost_USE_STATIC_LIBS ON )
 set( Boost_USE_MULTITHREADED ON )
-set( Boost_USE_STATIC_RUNTIME OFF )
+set( Boost_USE_STATIC_RUNTIME ON )
 find_package( Boost 1.49 COMPONENTS system filesystem REQUIRED )
 
 if( CMAKE_COMPILER_IS_GNUCXX )
-  set( CMAKE_CXX_FLAGS "-O3 -ffast-math -msse3" )
+  tubetk_append_if_absent(CMAKE_FLAGS_RELEASE "-03")
+  tubetk_append_if_absent(CMAKE_FLAGS_RELEASE "-ffast-math")
+  tubetk_append_if_absent(CMAKE_FLAGS_RELEASE "-msse3")
 endif( CMAKE_COMPILER_IS_GNUCXX )
 
 SEMMacroBuildCLI(
@@ -59,13 +64,11 @@ SEMMacroBuildCLI(
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
   TARGET_LIBRARIES
     ${ITK_LIBRARIES} ${Boost_SYSTEM_LIBRARY} ${Boost_FILESYSTEM_LIBRARY}
+    TubeTKCommon
   ADDITIONAL_SRCS
     GraphKernel.cxx tubeShortestPathKernel.cxx tubeWLSubtreeKernel.cxx
   INCLUDE_DIRECTORIES
-    ${Boost_INCLUDE_DIRS}
-    ${TubeTK_SOURCE_DIR}/Base/CLI
-    ${TubeTK_SOURCE_DIR}/Base/Common
-    ${TubeTK_SOURCE_DIR}/Base/Filtering )
+    ${Boost_INCLUDE_DIRS} )
 
 if( BUILD_TESTING )
   add_subdirectory( Testing )

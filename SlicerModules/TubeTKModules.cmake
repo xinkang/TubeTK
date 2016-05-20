@@ -24,8 +24,10 @@
 set( proj SlicerModules )
 
 set( TubeTK_SLICER_MODULES
+  SegmentConnectedParzenPDF
   SpatialObjectsModule
-  InteractiveConnectedComponentsUsingParzenPDFs )
+  TortuosityModule
+  )
 
 if( NOT TubeTK_SOURCE_DIR )
   find_package( TubeTK REQUIRED )

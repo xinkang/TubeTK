@@ -94,14 +94,24 @@
       <flag>s</flag>
       <default>0.01</default>
     </float>
-    <string>
+    <file>
       <name>saveTransform</name>
       <label>Save Transform</label>
       <description>Filename to save the transform to.</description>
       <longflag>saveTransform</longflag>
+      <channel>output</channel>
       <flag>S</flag>
-      <default/>
-    </string>
+      <default></default>
+    </file>
+    <file>
+      <name>loadTransform</name>
+      <label>Load Transform</label>
+      <description>Filename to load the transform from.</description>
+      <longflag>loadTransform</longflag>
+      <channel>input</channel>
+      <flag>L</flag>
+      <default></default>
+    </file>
   </parameters>
   <parameters>
     <label>Blending Parameters</label>
@@ -111,6 +121,14 @@
       <description>Use average of overlapping pixels instead of blending.</description>
       <longflag>averageOverlap</longflag>
       <flag>a</flag>
+      <default>false</default>
+    </boolean>
+    <boolean>
+      <name>useFastBlending</name>
+      <label>Use fast blending</label>
+      <description>Use experimental method for blending.</description>
+      <longflag>useFastBlending</longflag>
+      <flag>f</flag>
       <default>false</default>
     </boolean>
   </parameters>

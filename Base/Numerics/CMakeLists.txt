@@ -23,20 +23,38 @@
 
 project( TubeTKNumerics )
 
-find_package( ITK REQUIRED )
-include( ${ITK_USE_FILE} )
+set( ${PROJECT_NAME}_ITK_COMPONENTS
+  ITKCommon
+  ITKHDF5
+  ITKIOImageBase
+  ITKImageFunction
+  ITKImageIntensity
+  ITKOptimizers
+  ITKSmoothing
+  ITKSpatialObjects
+  ITKStatistics
+  ITKTransform )
+
+if(NOT ITK_SOURCE_DIR)
+  find_package(ITK COMPONENTS ${${PROJECT_NAME}_ITK_COMPONENTS} REQUIRED)
+  include(${ITK_USE_FILE})
+else()
+  set(itk-module ${PROJECT_NAME})
+  itk_module_use(${${PROJECT_NAME}_ITK_COMPONENTS})
+  itk_module_link_dependencies()
+endif()
 
 set( TubeTK_Base_Numerics_H_Files
   itktubeBasisFeatureVectorGenerator.h
   itktubeBlurImageFunction.h
+  itktubeComputeImageSimilarityMetrics.h
   itktubeFeatureVectorGenerator.h
   itktubeImageRegionMomentsCalculator.h
   itktubeJointHistogramImageFunction.h
   itktubeNJetFeatureVectorGenerator.h
   itktubeNJetImageFunction.h
-  itktubeSingleValuedCostFunctionImageSource.h
   itktubeRecordOptimizationParameterProgressionCommand.h
-  itktubeRidgeFeatureVectorGenerator.h
+  itktubeRidgeFFTFeatureVectorGenerator.h
   itktubeVectorImageToListGenerator.h
   itktubeVotingResampleImageFunction.h
   tubeBrentOptimizer1D.h
@@ -54,21 +72,18 @@ set( TubeTK_Base_Numerics_H_Files
 set( TubeTK_Base_Numerics_HXX_Files
   itktubeBasisFeatureVectorGenerator.hxx
   itktubeBlurImageFunction.hxx
+  itktubeComputeImageSimilarityMetrics.hxx
   itktubeFeatureVectorGenerator.hxx
   itktubeImageRegionMomentsCalculator.hxx
   itktubeJointHistogramImageFunction.hxx
   itktubeNJetFeatureVectorGenerator.hxx
   itktubeNJetImageFunction.hxx
-  itktubeSingleValuedCostFunctionImageSource.hxx
   itktubeRecordOptimizationParameterProgressionCommand.hxx
-  itktubeRidgeFeatureVectorGenerator.hxx
+  itktubeRidgeFFTFeatureVectorGenerator.hxx
   itktubeVectorImageToListGenerator.hxx
   itktubeVotingResampleImageFunction.hxx
   tubeMatrixMath.hxx
   tubeTubeMath.hxx )
-
-include_directories(
-  ${TubeTK_SOURCE_DIR}/Base/Common )
 
 set( TubeTK_Base_Numerics_SRCS
   tubeBrentOptimizer1D.cxx
@@ -80,24 +95,29 @@ set( TubeTK_Base_Numerics_SRCS
   tubeSplineApproximation1D.cxx
   tubeSplineND.cxx )
 
-add_library( TubeTKNumerics STATIC
+add_library( ${PROJECT_NAME} STATIC
   ${TubeTK_Base_Numerics_H_Files}
   ${TubeTK_Base_Numerics_HXX_Files}
   ${TubeTK_Base_Numerics_SRCS} )
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  target_link_libraries( ${PROJECT_NAME} PUBLIC ${ArrayFire_LIBRARIES} )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
+target_link_libraries( ${PROJECT_NAME} PUBLIC TubeTKCommon )
+target_include_directories( ${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}> )
 
-target_link_libraries( TubeTKNumerics TubeTKCommon ${ITK_LIBRARIES} )
-
-set( TARGETS TubeTKNumerics )
-TubeTKMacroInstallPlugins( ${TARGETS} )
-
-if( BUILD_TESTING )
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
 
-install( FILES
-  ${TubeTK_Base_Numerics_H_Files}
-  ${TubeTK_Base_Numerics_HXX_Files}
-  DESTINATION include )
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_Numerics_H_Files}
+    ${TubeTK_Base_Numerics_HXX_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
 
-# Export target
-set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS TubeTKNumerics )
+  TubeTKMacroInstallPlugins( ${PROJECT_NAME} )
+endif()
+
+set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS ${PROJECT_NAME} )

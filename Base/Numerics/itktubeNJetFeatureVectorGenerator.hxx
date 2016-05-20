@@ -43,18 +43,20 @@ template< class TImage >
 NJetFeatureVectorGenerator< TImage >
 ::NJetFeatureVectorGenerator( void )
 {
-  m_ZeroScales.resize( 0 );
-  m_FirstScales.resize( 0 );
-  m_SecondScales.resize( 0 );
-  m_RidgeScales.resize( 0 );
-
-  m_ForceOrientationInsensitivity = true;
+  m_ZeroScales.clear();
+  m_FirstScales.clear();
+  m_SecondScales.clear();
+  m_RidgeScales.clear();
 }
 
 template< class TImage >
 NJetFeatureVectorGenerator< TImage >
 ::~NJetFeatureVectorGenerator()
 {
+  m_ZeroScales.clear();
+  m_FirstScales.clear();
+  m_SecondScales.clear();
+  m_RidgeScales.clear();
 }
 
 template< class TImage >
@@ -108,29 +110,22 @@ NJetFeatureVectorGenerator< TImage >
       njet->DerivativeAtIndex( indx, m_FirstScales[s], v );
       for( unsigned int d = 0; d < ImageDimension; d++ )
         {
-        if( m_ForceOrientationInsensitivity && v[d] < 0 )
-          {
-          v[d] *= -1;
-          }
         featureVector[featureCount++] = v[d];
         val += v[d] * v[d];
         }
-      featureVector[featureCount++] = vcl_sqrt( val );
+      featureVector[featureCount++] = std::sqrt( val );
       }
 
     for( unsigned int s = 0; s < m_SecondScales.size(); s++ )
       {
+      val = 0.0;
       njet->HessianAtIndex( indx, m_SecondScales[s], m );
       for( unsigned int d = 0; d < ImageDimension; d++ )
         {
-        if( m_ForceOrientationInsensitivity && m[d][d] < 0 )
-          {
-          m[d][d] *= -1;
-          }
         featureVector[featureCount++] = m[d][d];
         val += m[d][d]*m[d][d];
         }
-      featureVector[featureCount++] = vcl_sqrt( val );
+      featureVector[featureCount++] = std::sqrt( val );
       }
 
     for( unsigned int s = 0; s < m_RidgeScales.size(); s++ )
@@ -142,6 +137,22 @@ NJetFeatureVectorGenerator< TImage >
       featureVector[featureCount++] = njet->GetMostRecentRidgeLevelness();
       }
     }
+
+  if( numFeatures != featureCount )
+    {
+    std::cerr << "BUG: featureCount != Expected number of features"
+      << std::endl;
+    }
+
+  for( unsigned int i=0; i<numFeatures; ++i )
+    {
+    if( this->GetWhitenStdDev( i ) > 0 )
+      {
+      featureVector[i] = ( featureVector[i] - this->GetWhitenMean(i) )
+        / this->GetWhitenStdDev( i );
+      }
+    }
+
   return featureVector;
 }
 
@@ -157,6 +168,13 @@ NJetFeatureVectorGenerator< TImage >
   typename NJetFunctionType::VectorType v;
   typename NJetFunctionType::MatrixType m;
 
+  double fNumMean = this->GetWhitenMean( fNum );
+  double fNumStdDev = this->GetWhitenStdDev( fNum );
+  if( fNumStdDev <= 0 )
+    {
+    fNumMean = 0;
+    fNumStdDev = 1;
+    }
   double val = 0.0;
   unsigned int featureCount = 0;
   for( unsigned int inputImageNum = 0; inputImageNum < numInputImages;
@@ -170,64 +188,58 @@ NJetFeatureVectorGenerator< TImage >
         {
         if( featureCount == fNum )
           {
-          return njet->EvaluateAtIndex( indx, this->m_ZeroScales[s] );
+          return ( njet->EvaluateAtIndex( indx, m_ZeroScales[s] )
+            - fNumMean ) / fNumStdDev;
           }
         featureCount++;
         }
       }
-    else if( fNum < m_ZeroScales.size()
-      + (m_FirstScales.size() * ImageDimension) + 1 )
+    else if( fNum < ( m_ZeroScales.size()
+      + m_FirstScales.size() * (ImageDimension + 1) ) )
       {
       featureCount = m_ZeroScales.size();
       for( unsigned int s = 0; s < m_FirstScales.size(); s++ )
         {
         val = 0.0;
-        njet->DerivativeAtIndex( indx, 4, v );
+        njet->DerivativeAtIndex( indx, m_FirstScales[s], v );
         for( unsigned int d = 0; d < ImageDimension; d++ )
           {
-          if( m_ForceOrientationInsensitivity && v[d] < 0 )
-            {
-            v[d] *= -1;
-            }
           if( featureCount == fNum )
             {
-            return v[d];
+            return ( v[d] - fNumMean ) / fNumStdDev;
             }
           featureCount++;
           val += v[d]*v[d];
           }
         if( featureCount == fNum )
           {
-          return vcl_sqrt( val );
+          return ( std::sqrt( val ) - fNumMean ) / fNumStdDev;
           }
         featureCount++;
         }
       }
     else if( fNum < m_ZeroScales.size()
-      + (m_FirstScales.size() * ImageDimension) + 1
-      + (m_SecondScales.size() * ImageDimension) + 1 )
+      + m_FirstScales.size() * (ImageDimension + 1)
+      + m_SecondScales.size() * (ImageDimension + 1) )
       {
       featureCount = m_ZeroScales.size()
-        + (m_FirstScales.size() * ImageDimension) + 1;
+        + m_FirstScales.size() * (ImageDimension + 1);
       for( unsigned int s = 0; s < m_SecondScales.size(); s++ )
         {
+        val = 0.0;
         njet->HessianAtIndex( indx, m_SecondScales[s], m );
         for( unsigned int d = 0; d < ImageDimension; d++ )
           {
-          if( m_ForceOrientationInsensitivity && m[d][d] < 0 )
-            {
-            m[d][d] *= -1;
-            }
           if( featureCount == fNum )
             {
-            return m[d][d];
+            return ( m[d][d] - fNumMean ) / fNumStdDev;
             }
           featureCount++;
           val += m[d][d]*m[d][d];
           }
         if( featureCount == fNum )
           {
-          return vcl_sqrt( val );
+          return ( std::sqrt( val ) - fNumMean ) / fNumStdDev;
           }
         featureCount++;
         }
@@ -235,28 +247,36 @@ NJetFeatureVectorGenerator< TImage >
     else
       {
       featureCount = m_ZeroScales.size()
-        + (m_FirstScales.size() * ImageDimension) + 1
-        + (m_SecondScales.size() * ImageDimension) + 1;
+        + m_FirstScales.size() * (ImageDimension + 1)
+        + m_SecondScales.size() * (ImageDimension + 1);
       for( unsigned int s = 0; s < m_RidgeScales.size(); s++ )
         {
         if( featureCount == fNum )
           {
-          return njet->RidgenessAtIndex( indx, m_RidgeScales[s] );
+          njet->RidgenessAtIndex( indx, m_RidgeScales[s] );
+          return ( njet->GetMostRecentRidgeness()
+            - fNumMean ) / fNumStdDev;
           }
         featureCount++;
         if( featureCount == fNum )
           {
-          return njet->GetMostRecentRidgeRoundness();
+          njet->RidgenessAtIndex( indx, m_RidgeScales[s] );
+          return ( njet->GetMostRecentRidgeRoundness()
+            - fNumMean ) / fNumStdDev;
           }
         featureCount++;
         if( featureCount == fNum )
           {
-          return njet->GetMostRecentRidgeCurvature();
+          njet->RidgenessAtIndex( indx, m_RidgeScales[s] );
+          return ( njet->GetMostRecentRidgeCurvature()
+            - fNumMean ) / fNumStdDev;
           }
         featureCount++;
         if( featureCount == fNum )
           {
-          return njet->GetMostRecentRidgeLevelness();
+          njet->RidgenessAtIndex( indx, m_RidgeScales[s] );
+          return ( njet->GetMostRecentRidgeLevelness()
+            - fNumMean ) / fNumStdDev;
           }
         featureCount++;
         }
@@ -332,34 +352,9 @@ NJetFeatureVectorGenerator< TImage >
 template< class TImage >
 void
 NJetFeatureVectorGenerator< TImage >
-::SetForceOrientationInsensitivity( bool _forceOrientationInsensitivity )
-{
-  m_ForceOrientationInsensitivity = _forceOrientationInsensitivity;
-}
-
-template< class TImage >
-bool
-NJetFeatureVectorGenerator< TImage >
-::GetForceOrientationInsensitivity( void ) const
-{
-  return m_ForceOrientationInsensitivity;
-}
-
-template< class TImage >
-void
-NJetFeatureVectorGenerator< TImage >
 ::PrintSelf( std::ostream & os, Indent indent ) const
 {
   Superclass::PrintSelf( os, indent );
-
-  if( m_ForceOrientationInsensitivity )
-    {
-    os << indent << "ForceOrientationInsensitivity = true" << std::endl;
-    }
-  else
-    {
-    os << indent << "ForceOrientationInsensitivity = false" << std::endl;
-    }
 
   os << indent << "ZeroScales.size() = " << m_ZeroScales.size()
     << std::endl;

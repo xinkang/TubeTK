@@ -42,7 +42,7 @@ void RegisterTests( void )
   REGISTER_TEST( itktubeSingleValuedCostFunctionImageSourceTest );
   REGISTER_TEST( itktubeRecordOptimizationParameterProgressionCommandTest );
   REGISTER_TEST( itktubeRidgeBasisFeatureVectorGeneratorTest );
-  REGISTER_TEST( itktubeRidgeFeatureVectorGeneratorTest );
+  REGISTER_TEST( itktubeRidgeFFTFeatureVectorGeneratorTest );
   REGISTER_TEST( itktubeVotingResampleImageFunctionTest );
   REGISTER_TEST( tubeBrentOptimizer1DTest );
   REGISTER_TEST( tubeBrentOptimizerNDTest );
@@ -51,5 +51,6 @@ void RegisterTests( void )
   REGISTER_TEST( tubeParabolicFitOptimizer1DTest );
   REGISTER_TEST( tubeSplineApproximation1DTest );
   REGISTER_TEST( tubeSplineNDTest );
+  REGISTER_TEST( tubeTubeMathTest );
   REGISTER_TEST( tubeUserFunctionTest );
 }

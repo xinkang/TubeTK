@@ -84,6 +84,13 @@ void qSlicerSpatialObjectsWidgetPrivate::init()
                    SIGNAL(clicked()), q,
                    SLOT(setColorBySolid()));
 
+  QObject::connect(this->SliceIntersectionCheckBox,
+                   SIGNAL(stateChanged(int)), q,
+                   SLOT(setSliceIntersection(int)));
+  QObject::connect(this->SliceIntersectionThicknessSpinBox,
+                   SIGNAL(valueChanged(double)), q,
+                   SLOT(setSliceIntersectionThickness(double)));
+
   QObject::connect(this->ColorBySolidColorPicker,
                    SIGNAL(colorChanged(QColor)), q,
                    SLOT(onColorBySolidChanged(QColor)));
@@ -100,7 +107,7 @@ void qSlicerSpatialObjectsWidgetPrivate::init()
 
   QObject::connect(this->ScalarRangeWidget,
                    SIGNAL(valuesChanged(double,double)), q,
-                   SLOT(onColorByScalarRangeChanged(double,double)));
+                   SLOT(onColorByScalarValuesChanged(double,double)));
 
   QObject::connect(this->OpacitySlider,
                    SIGNAL(valueChanged(double)), q,
@@ -175,25 +182,26 @@ SpatialObjectsDisplayPropertiesNode() const
 }
 
 //------------------------------------------------------------------------------
-void qSlicerSpatialObjectsWidget::setSpatialObjectsNode(vtkMRMLNode* node)
+void qSlicerSpatialObjectsWidget::setSpatialObjectsNode(vtkMRMLNode* node, int DisplayNodeIndex)
 {
-  this->setSpatialObjectsNode(vtkMRMLSpatialObjectsNode::SafeDownCast(node));
+  this->setSpatialObjectsNode(vtkMRMLSpatialObjectsNode::SafeDownCast(node), DisplayNodeIndex);
 }
 
 //------------------------------------------------------------------------------
 void qSlicerSpatialObjectsWidget::
-setSpatialObjectsNode(vtkMRMLSpatialObjectsNode* SpatialObjectsNode)
+setSpatialObjectsNode(vtkMRMLSpatialObjectsNode* SpatialObjectsNode, int DisplayNodeIndex)
 {
   Q_D(qSlicerSpatialObjectsWidget);
 
   vtkMRMLSpatialObjectsNode *oldNode = this->SpatialObjectsNode();
   d->SpatialObjectsNode = SpatialObjectsNode;
 
+  this->setSpatialObjectsDisplayNode(
+    d->SpatialObjectsNode ? d->SpatialObjectsNode->GetNthDisplayNode(DisplayNodeIndex) : NULL);
+
   qvtkReconnect(oldNode, this->SpatialObjectsNode(),
                 vtkCommand::ModifiedEvent, this,
                 SLOT(updateWidgetFromMRML()));
-
-  this->updateWidgetFromMRML();
 }
 
 //------------------------------------------------------------------------------
@@ -305,6 +313,32 @@ void qSlicerSpatialObjectsWidget::setColorBySolid()
 }
 
 //------------------------------------------------------------------------------
+void qSlicerSpatialObjectsWidget::setSliceIntersection(int intersection)
+{
+  Q_D(qSlicerSpatialObjectsWidget);
+
+  if(!d->SpatialObjectsDisplayNode)
+    {
+    return;
+    }
+
+  d->SpatialObjectsDisplayNode->SetSliceIntersectionVisibility(intersection);
+}
+
+//------------------------------------------------------------------------------
+void qSlicerSpatialObjectsWidget::setSliceIntersectionThickness(double value)
+{
+  Q_D(qSlicerSpatialObjectsWidget);
+
+  if(!d->SpatialObjectsDisplayNode)
+    {
+    return;
+    }
+
+  d->SpatialObjectsDisplayNode->SetSliceIntersectionThickness(value);
+}
+
+//------------------------------------------------------------------------------
 void qSlicerSpatialObjectsWidget::setColorByScalar()
 {
   Q_D(qSlicerSpatialObjectsWidget);
@@ -314,6 +348,7 @@ void qSlicerSpatialObjectsWidget::setColorByScalar()
     return;
     }
 
+  d->SpatialObjectsDisplayNode->SetScalarRangeFlag(vtkMRMLDisplayNode::UseDisplayNodeScalarRange);
   d->SpatialObjectsDisplayNode->SetColorModeToScalarData();
   d->SpatialObjectsDisplayNode->SetScalarVisibility(1);
   this->onColorByScalarChanged(d->ColorByScalarComboBox->currentIndex());
@@ -348,17 +383,36 @@ void qSlicerSpatialObjectsWidget::onColorByScalarChanged(int scalarIndex)
       GetPointData()->GetScalars(activeScalarName.toLatin1());
     currentScalar->GetRange(range, -1);
 
-    d->ScalarRangeWidget->setRange(range[0], range[1]);
-    d->ScalarRangeWidget->setValues(range[0], range[1]);
-    d->ScalarRangeWidget->setSingleStep((range[1]-range[0])/100);
-    }
+    double singleStep;
+    // If range is 0, set singlestep to 1 to avoid having a singleStep of 0
+    if(range[0] == range[1])
+      {
+      singleStep = 1;
+      }
+    else
+      {
+      singleStep = (range[1]-range[0])/100;
+      }
 
-  // Color spatial object as the range has changed
-  this->onColorByScalarRangeChanged(range[0], range[1]);
+    // Workaround a bug of ctkRangeWidget
+    // TO FIX in CTK
+    if(range[1]-range[0] < d->ScalarRangeWidget->singleStep())
+      {
+      d->ScalarRangeWidget->setSingleStep(singleStep);
+      d->ScalarRangeWidget->setRange(range[0], range[1]);
+      }
+    else
+      {
+      d->ScalarRangeWidget->setRange(range[0], range[1]);
+      d->ScalarRangeWidget->setSingleStep(singleStep);
+      }
+
+    d->ScalarRangeWidget->setValues(range[0], range[1]);
+    }
 }
 
 //------------------------------------------------------------------------------
-void qSlicerSpatialObjectsWidget::onColorByScalarRangeChanged(double minValue,
+void qSlicerSpatialObjectsWidget::onColorByScalarValuesChanged(double minValue,
                                                               double maxValue)
 {
   Q_D(qSlicerSpatialObjectsWidget);
@@ -372,11 +426,11 @@ void qSlicerSpatialObjectsWidget::onColorByScalarRangeChanged(double minValue,
     return;
     }
 
-    // Set the Range given the current ScalarColor
-    double range[2];
-    range[0] = minValue;
-    range[1] = maxValue;
-    d->SpatialObjectsDisplayNode->SetScalarRange(range);
+    // Set the values for coloring by scalar
+    double values[2];
+    values[0] = minValue;
+    values[1] = maxValue;
+    d->SpatialObjectsDisplayNode->SetScalarRange(values);
 }
 
 //------------------------------------------------------------------------------
@@ -568,10 +622,41 @@ void qSlicerSpatialObjectsWidget::updateWidgetFromMRML()
     d->SpatialObjectsDisplayNode->GetVisibility());
   d->OpacitySlider->setValue(d->SpatialObjectsDisplayNode->GetOpacity());
 
-  d->ColorByScalarsColorTableComboBox->setCurrentNode
+  d->ColorByScalarsColorTableComboBox->setCurrentNodeID
     (d->SpatialObjectsDisplayNode->GetColorNodeID());
-  d->ColorByScalarComboBox->setDataSet(
-    vtkDataSet::SafeDownCast(d->SpatialObjectsNode->GetPolyData()));
+
+  // We have to make that check, otherwise, if the datasets are the same,
+  // when calling d->ColorByScalarComboBox->setCurrentArray(), it will always actually
+  // change the current array (when it's the same name, it doesn't change it) and fire
+  // signals (because the currentArray was previously "")
+  // If the signals are fired, it calls back onColorByScalarChanged, which resets the
+  // range to the min and max of the dataArray. We have an override situation, and it
+  // makes it impossible to move the slider.
+  if(d->ColorByScalarComboBox->dataSet() != d->SpatialObjectsNode->GetPolyData())
+    {
+    // Block the signals, because setDatSet modifies the comboBox which triggers
+    // updateWidgetFromMRML, and onColorByScalarChanged which also triggers
+    // updateWidgetFromMRML.
+    // In total, updateWidgetFromMRML will be called 5 times...
+    // the currentIndexChanged(int) of the combobox is fired twice when doing
+    // setDataset(). This has to be fixed in CTK.
+    bool wasBlocking = d->ColorByScalarComboBox->blockSignals(true);
+
+    // This function has to be fixed in CTK, it shouldn't fire 2 signals (see above)
+    d->ColorByScalarComboBox->setDataSet(
+      vtkDataSet::SafeDownCast(d->SpatialObjectsNode->GetPolyData()));
+    // Reset the current Array to blank, because setDataSet sets
+    // the currentIndex to "TubeRadius" by default, and if we leave it like this,
+    // the signal currentIndexChanged won't be fired when we switch to a node which
+    // activeScalarName is TubeRadius (and the rangeWidget won't be updated)
+    d->ColorByScalarComboBox->setCurrentArray("");
+
+    d->ColorByScalarComboBox->blockSignals(wasBlocking);
+    }
+
+  d->ColorByScalarComboBox->setCurrentArray(
+    d->SpatialObjectsDisplayNode->GetActiveScalarName());
+
 
   switch(d->SpatialObjectsDisplayNode->GetColorMode())
     {

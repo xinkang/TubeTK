@@ -23,14 +23,12 @@
 
 project( TubeTKCommon )
 
-find_package( ITK REQUIRED )
-include( ${ITK_USE_FILE} )
-
-find_package( SlicerExecutionModel REQUIRED )
-include( ${SlicerExecutionModel_USE_FILE} )
+if(NOT ITK_SOURCE_DIR)
+  find_package( ITK REQUIRED )
+  include( ${ITK_USE_FILE} )
+endif()
 
 set( TubeTK_Base_Common_H_Files
-  itktubeDifferenceImageFilter.h
   tubeIndent.h
   tubeMacro.h
   tubeMessage.h
@@ -38,53 +36,33 @@ set( TubeTK_Base_Common_H_Files
   tubeStringUtilities.h
   tubeTestMain.h )
 
-set( TubeTK_Base_Common_HXX_Files
-  itktubeDifferenceImageFilter.hxx )
+set( TubeTK_Base_Common_HXX_Files )
 
 set( TubeTK_Base_Common_CXX_Files
   tubeIndent.cxx
   tubeObject.cxx )
 
-add_library( TubeTKCommon STATIC
+add_library( ${PROJECT_NAME} STATIC
   ${TubeTK_Base_Common_H_Files}
   ${TubeTK_Base_Common_HXX_Files}
   ${TubeTK_Base_Common_CXX_Files} )
+target_link_libraries( ${PROJECT_NAME}
+  ${ITK_LIBRARIES} )
+target_include_directories( ${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}> )
 
-TubeTKMacroInstallPlugins( TubeTKCommon )
-
-SEMMacroBuildCLI(
-  NAME "ImageCompareCommand"
-  LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
-  TARGET_LIBRARIES ${ITK_LIBRARIES}
-  INCLUDE_DIRECTORIES
-    #${TubeTK_SOURCE_DIR}/Base/CLI
-    #${TubeTK_SOURCE_DIR}/Base/Common
-    #${TubeTK_SOURCE_DIR}/Base/Filtering
-    ${TubeTK_SLICER_SOURCE_DIR}/Modules/CLI/ExpertAutomatedRegistration
-    ${TubeTK_SLICER_SOURCE_DIR}/Modules/CLI/ExpertAutomatedRegistration/ITKRegistrationHelper )
-
-add_executable( JsonCompareCommand JsonCompareCommand.cxx )
-target_link_libraries( JsonCompareCommand
-  ${ITK_LIBRARIES}
-  ${JsonCpp_LIBRARIES} )
-
-add_executable( TextCompareCommand TextCompareCommand.cxx )
-target_link_libraries( TextCompareCommand ${ITK_LIBRARIES} )
-
-if( BUILD_TESTING )
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
 
-install( FILES
-  ${TubeTK_Base_Common_H_Files}
-  ${TubeTK_Base_Common_HXX_Files}
-  DESTINATION include )
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_Common_H_Files}
+    ${TubeTK_Base_Common_HXX_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
 
-install( TARGETS
-  ImageCompareCommand
-  JsonCompareCommand
-  TextCompareCommand
-  DESTINATION bin
-  COMPONENT RUNTIME )
+  TubeTKMacroInstallPlugins( ${PROJECT_NAME} )
+endif()
 
-set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS TubeTKCommon )
+set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS ${PROJECT_NAME} )

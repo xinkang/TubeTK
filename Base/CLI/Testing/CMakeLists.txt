@@ -34,6 +34,12 @@ if( PYTHON_EXECUTABLE )
     ${TubeTK_SOURCE_DIR}/Base/CLI )
 endif( PYTHON_EXECUTABLE )
 
+find_package( SlicerExecutionModel REQUIRED )
+include( ${SlicerExecutionModel_USE_FILE} )
+
+find_package( ITK REQUIRED )
+include( ${ITK_USE_FILE} )
+
 set( BASE_CLI_TESTS
    ${TubeTK_LAUNCHER} $<TARGET_FILE:tubeBaseCLITests> )
 
@@ -41,9 +47,6 @@ set( BASE_CLI_HEADER_TEST
   ${TubeTK_LAUNCHER} $<TARGET_FILE:tubeBaseCLIHeaderTest> )
 
 set( TEMP ${TubeTK_BINARY_DIR}/Temporary )
-
-find_package( GenerateCLP REQUIRED )
-include( ${GenerateCLP_USE_FILE} )
 
 set( tubeCLIHelperFunctionsTest_SOURCE tubeCLIHelperFunctionsTest.cxx )
 
@@ -55,10 +58,24 @@ set( tubeBaseCLITests_SRCS
 
 include_directories(
   ${TubeTK_SOURCE_DIR}/Base/CLI
+  ${TubeTK_SOURCE_DIR}/Base/Filtering
   ${TubeTK_SOURCE_DIR}/Base/Common )
 
 add_executable( tubeBaseCLIHeaderTest tubeBaseCLIHeaderTest.cxx )
 target_link_libraries( tubeBaseCLIHeaderTest ${ITK_LIBRARIES} )
+
+set(tubeBaseCLITests_TARGET_LIBRARIES
+  ${ITK_LIBRARIES}
+  TubeCLI )
+if( TubeTK_USE_JsonCpp )
+  list(APPEND tubeBaseCLITests_TARGET_LIBRARIES
+    ${JsonCpp_LIBRARIES} )
+endif( TubeTK_USE_JsonCpp )
+
+set(no_install_option )
+if(NOT TubeTK_INSTALL_DEVELOPMENT)
+  set(no_install_option NO_INSTALL)
+endif()
 
 SEMMacroBuildCLI(
   NAME tubeBaseCLITests
@@ -66,15 +83,9 @@ SEMMacroBuildCLI(
     ${tubeBaseCLITests_SRCS}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
   TARGET_LIBRARIES
-    ${ITK_LIBRARIES}
-    ${JsonCpp_LIBRARIES}
-  INCLUDE_DIRECTORIES
-    ${TubeTK_SOURCE_DIR}/Base/CLI
-    ${TubeTK_SOURCE_DIR}/Base/Common
-  INSTALL_RUNTIME_DESTINATION lib
-  INSTALL_LIBRARY_DESTINATION lib
-  INSTALL_ARCHIVE_DESTINATION bin
+    ${tubeBaseCLITests_TARGET_LIBRARIES}
   EXECUTABLE_ONLY
+  ${no_install_option}
   )
 
 add_test( NAME tubeBaseCLIHeaderTest COMMAND ${BASE_CLI_HEADER_TEST})

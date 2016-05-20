@@ -31,7 +31,7 @@ limitations under the License.
 #include "tubeTubeMath.h"
 
 #include <itkImageRegionSplitter.h>
-#include <itkSmoothingRecursiveGaussianImageFilter.h>
+#include <itktubeSmoothingRecursiveGaussianImageFilter.h>
 
 #include <vtkFloatArray.h>
 #include <vtkPointData.h>
@@ -165,7 +165,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
   int t = 0;
   ScalarDerivativeImagePointer firstOrder = 0;
   TensorDerivativeImagePointer secondOrder = 0;
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     for( int j = 0; j < this->GetNumberOfTerms(); j++ )
       {
@@ -401,7 +401,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
     {
     typename TubeType::Pointer tube
         = static_cast< TubeType * >( tubeIt->GetPointer() );
-    ::tube::ComputeTubeTangentsAndNormals< TubeType >( tube.GetPointer() );
+    ::tube::ComputeTubeTangentsAndNormals< TubeType >( tube );
     numPoints += tube->GetPoints().size();
     }
 
@@ -721,9 +721,9 @@ AnisotropicDiffusiveSparseRegistrationFilter
       surfaceDistance = 0.0;
       for( unsigned int i = 0; i < ImageDimension; i++ )
         {
-        surfaceDistance += vcl_pow( imageCoord[i] - borderCoord[i], 2 );
+        surfaceDistance += std::pow( imageCoord[i] - borderCoord[i], 2 );
         }
-      surfaceDistance = vcl_sqrt( surfaceDistance );
+      surfaceDistance = std::sqrt( surfaceDistance );
       }
     if( tubePointLocator )
       {
@@ -816,34 +816,34 @@ AnisotropicDiffusiveSparseRegistrationFilter
                                  itk::Point< double, ImageDimension> otherPoint ) const
 {
   double relativePoint[ImageDimension];
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     relativePoint[i] = otherPoint[i] - planePoint[i];
     }
 
   double projection1 = 0.0;
   double projection2 = 0.0;
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
-    projection1 += vcl_pow(relativePoint[i] * tangentVector1[i], 2);
-    projection2 += vcl_pow(relativePoint[i] * tangentVector2[i], 2);
+    projection1 += std::pow(relativePoint[i] * tangentVector1[i], 2);
+    projection2 += std::pow(relativePoint[i] * tangentVector2[i], 2);
     }
-  projection1 = vcl_sqrt( projection1 );
-  projection2 = vcl_sqrt( projection2 );
+  projection1 = std::sqrt( projection1 );
+  projection2 = std::sqrt( projection2 );
 
   double pointOnPlane[ImageDimension];
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     pointOnPlane[i] = projection1 * tangentVector1[i]
         + projection2 * tangentVector2[i];
     }
 
   double distance = 0.0;
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
-    distance += vcl_pow( pointOnPlane[i], 2 );
+    distance += std::pow( pointOnPlane[i], 2 );
     }
-  distance = vcl_sqrt( distance );
+  distance = std::sqrt( distance );
   return distance;
 }
 
@@ -894,7 +894,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
   if( computeWeightRegularizations )
     {
     double weightSmoothingSigma = 1.0;
-    typedef itk::SmoothingRecursiveGaussianImageFilter
+    typedef itk::tube::SmoothingRecursiveGaussianImageFilter
         < WeightComponentImageType, WeightComponentImageType >
         WeightSmoothingFilterType;
     typename WeightSmoothingFilterType::Pointer weightSmooth
@@ -951,7 +951,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
   < TFixedImage, TMovingImage, TDeformationField >
 ::ComputeWeightFromDistanceExponential( const WeightComponentType distance ) const
 {
-  return vcl_exp( -1.0 * m_Lambda * distance );
+  return std::exp( -1.0 * m_Lambda * distance );
 }
 
 /**
@@ -968,7 +968,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
 ::ComputeWeightFromDistanceDirac( const WeightComponentType distance ) const
 {
   return 1.0 - ( 1.0 / ( 1.0 + m_Lambda * m_Gamma
-                         * vcl_exp( -1.0 * m_Lambda * distance * distance ) ) );
+                         * std::exp( -1.0 * m_Lambda * distance * distance ) ) );
 }
 
 /**
@@ -1136,7 +1136,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
   DeformationVectorType N_l;
   N_l.Fill( 0.0 );
 
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     // Create the multiplication vector image that is shared between the PROPs
     DeformationFieldPointer normalMultsImage = DeformationFieldType::New();
@@ -1154,7 +1154,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
       multVector.Fill( 0.0 );
       N = normalIt.Get();
       A = weightStructuresIt.Get();
-      for( int j = 0; j < ImageDimension; j++ )
+      for( unsigned int j = 0; j < ImageDimension; j++ )
         {
         N_l[j] = N[i][j];
         }
@@ -1167,7 +1167,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
     this->SetMultiplicationVectorImage( PROP_NORMAL, i, normalMultsImage );
     }
 
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     assert( this->GetMultiplicationVectorImage( SMOOTH_TANGENTIAL, i )
             == this->GetMultiplicationVectorImage( SMOOTH_NORMAL, i ) );
@@ -1191,7 +1191,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
   // Conveniently, (NAN_l) is the PROP multiplication vector (for both SMOOTH
   // and PROP), so we don't need to compute it again here
   DeformationVectorImageRegionArrayType NAN_lRegionArray;
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     DeformationFieldPointer propMultImage
         = this->GetMultiplicationVectorImage( PROP_TANGENTIAL, i );
@@ -1223,7 +1223,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
 
   outputRegion.GoToBegin();
   normalDeformationRegion.GoToBegin();
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     NAN_lRegionArray[i].GoToBegin();
     }
@@ -1231,7 +1231,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
   while( !outputRegion.IsAtEnd() )
     {
     u = outputRegion.Get();
-    for( int i = 0; i < ImageDimension; i++ )
+    for( unsigned int i = 0; i < ImageDimension; i++ )
       {
       normalDeformationVector[i] = NAN_lRegionArray[i].Get() * u;
       }
@@ -1252,7 +1252,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
 
     ++outputRegion;
     ++normalDeformationRegion;
-    for( int i = 0; i < ImageDimension; i++ )
+    for( unsigned int i = 0; i < ImageDimension; i++ )
       {
       ++NAN_lRegionArray[i];
       }
@@ -1296,7 +1296,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
       DiffusiveRegistrationFilterUtils::ExtractXYZComponentsFromDeformationField(
             this->GetDeformationComponentImage(i), deformationComponentImageArray );
 
-      for( int j = 0; j < ImageDimension; j++ )
+      for( unsigned int j = 0; j < ImageDimension; j++ )
         {
         this->ComputeDeformationComponentDerivativeImageHelper(
             deformationComponentImageArray[j], i, j, spacing, radius );
@@ -1304,7 +1304,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
       }
     }
 
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     assert( this->GetDeformationComponentFirstOrderDerivative(
         SMOOTH_TANGENTIAL, i )
@@ -1381,7 +1381,7 @@ AnisotropicDiffusiveSparseRegistrationFilter
        ++normalMatrixIt, ++normalVectorIt )
     {
     matrix = normalMatrixIt.Get();
-    for( int i = 0; i < ImageDimension; i++ )
+    for( unsigned int i = 0; i < ImageDimension; i++ )
       {
       vector[i] = matrix(i,dim);
       normalVectorIt.Set( vector );

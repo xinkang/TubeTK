@@ -141,11 +141,6 @@ int DoIt( int argc, char * argv[] )
       }
     }
 
-  if( usePCA )
-    {
-    basisGenerator->SetPerformPCA( true );
-    }
-
   if( !loadBasisInfo.empty() )
     {
     timeCollector.Start( "LoadBasis" );
@@ -157,13 +152,23 @@ int DoIt( int argc, char * argv[] )
     fvGenerator->SetFirstScales( basisReader.GetFirstScales() );
     fvGenerator->SetSecondScales( basisReader.GetSecondScales() );
     fvGenerator->SetRidgeScales( basisReader.GetRidgeScales() );
-    basisGenerator->SetWhitenMeans( basisReader.GetWhitenMeans() );
-    basisGenerator->SetWhitenStdDevs( basisReader.GetWhitenStdDevs() );
+    basisGenerator->SetNumberOfPCABasisToUseAsFeatures(
+      basisReader.GetNumberOfPCABasisToUseAsFeatures() );
+    basisGenerator->SetNumberOfLDABasisToUseAsFeatures(
+      basisReader.GetNumberOfLDABasisToUseAsFeatures() );
+    basisGenerator->SetInputWhitenMeans( basisReader.
+      GetInputWhitenMeans() );
+    basisGenerator->SetInputWhitenStdDevs( basisReader.
+      GetInputWhitenStdDevs() );
+    basisGenerator->SetOutputWhitenMeans( basisReader.
+      GetOutputWhitenMeans() );
+    basisGenerator->SetOutputWhitenStdDevs( basisReader.
+      GetOutputWhitenStdDevs() );
     basisGenerator->SetBasisValues( basisReader.GetLDAValues() );
     basisGenerator->SetBasisMatrix( basisReader.GetLDAMatrix() );
 
-    //basisGenerator->SetForceIntensityConsistency( !forceSignOff );
-    //basisGenerator->SetForceOrientationInsensitivity( forceSymmetry );
+    fvGenerator->SetUpdateWhitenStatisticsOnUpdate( false );
+    basisGenerator->SetUpdateWhitenStatisticsOnUpdate( false );
 
     timeCollector.Stop( "LoadBasis" );
     }
@@ -175,29 +180,33 @@ int DoIt( int argc, char * argv[] )
     fvGenerator->SetFirstScales( firstScales );
     fvGenerator->SetSecondScales( secondScales );
     fvGenerator->SetRidgeScales( ridgeScales );
-    basisGenerator->SetWhitenMeans( whitenMeans );
-    basisGenerator->SetWhitenStdDevs( whitenStdDevs );
+    fvGenerator->SetUpdateWhitenStatisticsOnUpdate( true );
+    fvGenerator->Update();
 
-    //basisGenerator->SetForceIntensityConsistency( !forceSignOff );
-    //basisGenerator->SetForceOrientationInsensitivity( forceSymmetry );
+    basisGenerator->SetNumberOfPCABasisToUseAsFeatures(
+      useNumberOfPCABasis );
+    if( useNumberOfLDABasis == -1 )
+      {
+      basisGenerator->SetNumberOfLDABasisToUseAsFeatures(
+        objectIdList.size() - 1 );
+      }
+    else
+      {
+      basisGenerator->SetNumberOfLDABasisToUseAsFeatures(
+        useNumberOfLDABasis );
+      }
 
-    basisGenerator->GenerateBasis();
+    basisGenerator->SetUpdateWhitenStatisticsOnUpdate( true );
+    basisGenerator->Update();
 
     timeCollector.Stop( "Update" );
     }
-
-  unsigned int numBasis = basisGenerator->GetNumberOfBasis();
-  if( useNumberOfBasis > 0 &&
-    useNumberOfBasis < static_cast<int>( numBasis ) )
-    {
-    numBasis = useNumberOfBasis;
-    }
-  basisGenerator->SetNumberOfBasisToUseAsFeatures( numBasis );
 
   if( !outputBase.empty() )
     {
     timeCollector.Start( "SaveBasisImages" );
 
+    unsigned int numBasis = basisGenerator->GetNumberOfFeatures();
     for( unsigned int i = 0; i < numBasis; i++ )
       {
       typename BasisImageWriterType::Pointer basisImageWriter =
@@ -222,10 +231,14 @@ int DoIt( int argc, char * argv[] )
       fvGenerator->GetFirstScales(),
       fvGenerator->GetSecondScales(),
       fvGenerator->GetRidgeScales(),
+      basisGenerator->GetNumberOfPCABasisToUseAsFeatures(),
+      basisGenerator->GetNumberOfLDABasisToUseAsFeatures(),
       basisGenerator->GetBasisValues(),
       basisGenerator->GetBasisMatrix(),
-      basisGenerator->GetWhitenMeans(),
-      basisGenerator->GetWhitenStdDevs() );
+      basisGenerator->GetInputWhitenMeans(),
+      basisGenerator->GetInputWhitenStdDevs(),
+      basisGenerator->GetOutputWhitenMeans(),
+      basisGenerator->GetOutputWhitenStdDevs() );
     basisWriter.Write( saveBasisInfo.c_str() );
     timeCollector.Stop( "SaveBasis" );
     }

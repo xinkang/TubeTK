@@ -70,10 +70,14 @@ MetaNJetLDA
                const NJetScalesType & firstScales,
                const NJetScalesType & secondScales,
                const NJetScalesType & ridgeScales,
+               unsigned int numberOfPCABasis,
+               unsigned int numberOfLDABasis,
                const LDAValuesType & ldaValues,
                const LDAMatrixType & ldaMatrix,
-               const ValueListType & whitenMeans,
-               const ValueListType & whitenStdDevs )
+               const ValueListType & inputWhitenMeans,
+               const ValueListType & inputWhitenStdDevs,
+               const ValueListType & outputWhitenMeans,
+               const ValueListType & outputWhitenStdDevs )
 {
   if( META_DEBUG )
     {
@@ -81,8 +85,10 @@ MetaNJetLDA
     }
 
   this->Clear();
-  this->InitializeEssential( zeroScales, firstScales, secondScales, ridgeScales,
-                             ldaValues, ldaMatrix, whitenMeans, whitenStdDevs );
+  this->InitializeEssential( zeroScales, firstScales, secondScales,
+    ridgeScales, numberOfPCABasis, numberOfLDABasis, ldaValues, ldaMatrix,
+    inputWhitenMeans, inputWhitenStdDevs, outputWhitenMeans,
+    outputWhitenStdDevs );
 }
 
 MetaNJetLDA
@@ -150,18 +156,23 @@ bool MetaNJetLDA
                        const NJetScalesType & firstScales,
                        const NJetScalesType & secondScales,
                        const NJetScalesType & ridgeScales,
+                       unsigned int numberOfPCABasis,
+                       unsigned int numberOfLDABasis,
                        const LDAValuesType & ldaValues,
                        const LDAMatrixType & ldaMatrix,
-                       const ValueListType & whitenMeans,
-                       const ValueListType & whitenStdDevs )
+                       const ValueListType & inputWhitenMeans,
+                       const ValueListType & inputWhitenStdDevs,
+                       const ValueListType & outputWhitenMeans,
+                       const ValueListType & outputWhitenStdDevs )
 {
   if( META_DEBUG )
     {
     METAIO_STREAM::cout << "MetaNJetLDA: Initialize" << METAIO_STREAM::endl;
     }
 
-  MetaLDA::InitializeEssential( ldaValues, ldaMatrix, whitenMeans,
-                                whitenStdDevs );
+  MetaLDA::InitializeEssential( numberOfPCABasis, numberOfLDABasis,
+    ldaValues, ldaMatrix, inputWhitenMeans, inputWhitenStdDevs,
+    outputWhitenMeans, outputWhitenStdDevs );
 
   this->SetZeroScales( zeroScales );
   this->SetFirstScales( firstScales );
@@ -384,8 +395,10 @@ bool MetaNJetLDA
   m_ReadStream = NULL;
 
   this->InitializeEssential( m_ZeroScales, m_FirstScales, m_SecondScales,
-                             m_RidgeScales, m_LDAValues, m_LDAMatrix,
-                             m_WhitenMeans, m_WhitenStdDevs );
+    m_RidgeScales, m_NumberOfPCABasisToUseAsFeatures,
+    m_NumberOfLDABasisToUseAsFeatures, m_LDAValues, m_LDAMatrix,
+    m_InputWhitenMeans, m_InputWhitenStdDevs, m_OutputWhitenMeans,
+    m_OutputWhitenStdDevs );
 
   return true;
 }
@@ -400,16 +413,19 @@ bool MetaNJetLDA
 
   MET_SetFileSuffix( m_FileName, "mnda" );
 
-  METAIO_STREAM::ofstream * const tmpWriteStream = new METAIO_STREAM::ofstream();
+  METAIO_STREAM::ofstream * const tmpWriteStream = new
+    METAIO_STREAM::ofstream();
 
   tmpWriteStream->open( m_FileName,
-                        METAIO_STREAM::ios::binary | METAIO_STREAM::ios::out );
+    METAIO_STREAM::ios::binary | METAIO_STREAM::ios::out );
 
   if( !tmpWriteStream->rdbuf()->is_open() )
     {
     delete tmpWriteStream;
     return false;
     }
+
+  tmpWriteStream->precision( 10 );
 
   const bool result = this->WriteStream( tmpWriteStream );
 

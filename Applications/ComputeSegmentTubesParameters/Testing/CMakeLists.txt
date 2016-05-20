@@ -32,26 +32,25 @@ set( TEMP ${TubeTK_BINARY_DIR}/Temporary )
 set( PROJ_EXE
   ${TubeTK_LAUNCHER} $<TARGET_FILE:${MODULE_NAME}> )
 
-set( IMAGECOMPARE_EXE
-  ${TubeTK_LAUNCHER} $<TARGET_FILE:ImageCompareCommand> )
+set( CompareImages_EXE
+  ${TubeTK_LAUNCHER} $<TARGET_FILE:CompareImages> )
 
-set( TEXTCOMPARE_EXE
-  ${TubeTK_LAUNCHER} $<TARGET_FILE:TextCompareCommand> )
+set( CompareTextFiles_EXE
+  ${TubeTK_LAUNCHER} $<TARGET_FILE:CompareTextFiles> )
 
 # Test1
 Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test1
   COMMAND ${PROJ_EXE}
-    -m MIDAS{im0001.vk.mask.crop.mha.md5}
-    -b 127 -v 255
-    -s 2
-    -d ${TEMP}/${MODULE_NAME}Test1
-    -o ${TEMP}/${MODULE_NAME}Test1
+    -v 1
+    MIDAS{SegmentTubeSeedsTest1.threshSkel.mha.md5}
+    MIDAS{SegmentTubeSeedsTest1_Scales.mha.md5}
     MIDAS{im0001.crop.contrast.mha.md5}
     ${TEMP}/${MODULE_NAME}Test1 )
 
 # Test1-Compare
 Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test1-Compare
-  COMMAND ${TEXTCOMPARE_EXE}
+  COMMAND ${CompareTextFiles_EXE}
+    -d 0.01
     -t ${TEMP}/${MODULE_NAME}Test1.mtp
     -b MIDAS{${MODULE_NAME}Test1.mtp.md5} )
 set_property( TEST ${MODULE_NAME}-Test1-Compare

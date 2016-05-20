@@ -24,9 +24,7 @@
 project( TubeTKRegistration )
 
 set( TubeTK_Base_Registration_H_Files
-  itktubeAnisotropicDiffusiveRegistrationFilter.h
   itktubeAnisotropicDiffusiveRegistrationFunction.h
-  itktubeAnisotropicDiffusiveSparseRegistrationFilter.h
   itktubeDiffusiveRegistrationFilter.h
   itktubeDiffusiveRegistrationFilterUtils.h
   itktubeImageToTubeRigidMetric.h
@@ -37,10 +35,14 @@ set( TubeTK_Base_Registration_H_Files
   itktubeTubeParametricExponentialWithBoundsResolutionWeightFunction.h
   itktubeTubeToTubeTransformFilter.h )
 
+if( TubeTK_USE_VTK )
+  list( APPEND TubeTK_Base_Registration_H_Files
+    itktubeAnisotropicDiffusiveSparseRegistrationFilter.h
+    itktubeAnisotropicDiffusiveRegistrationFilter.h )
+endif( TubeTK_USE_VTK )
+
 set( TubeTK_Base_Registration_HXX_Files
-  itktubeAnisotropicDiffusiveRegistrationFilter.hxx
   itktubeAnisotropicDiffusiveRegistrationFunction.hxx
-  itktubeAnisotropicDiffusiveSparseRegistrationFilter.hxx
   itktubeDiffusiveRegistrationFilter.hxx
   itktubeDiffusiveRegistrationFilterUtils.hxx
   itktubeImageToTubeRigidMetric.hxx
@@ -48,15 +50,34 @@ set( TubeTK_Base_Registration_HXX_Files
   itktubeMeanSquareRegistrationFunction.hxx
   itktubeTubeToTubeTransformFilter.hxx )
 
-add_custom_target( TubeTKRegistration SOURCES
-  ${TubeTK_Base_Registration_H_Files}
-  ${TubeTK_Base_Registration_HXX_Files} )
+if( TubeTK_USE_VTK )
+  list( APPEND TubeTK_Base_Registration_HXX_Files
+    itktubeAnisotropicDiffusiveSparseRegistrationFilter.hxx
+    itktubeAnisotropicDiffusiveRegistrationFilter.hxx )
+endif( TubeTK_USE_VTK )
 
-if( BUILD_TESTING )
+add_library( ${PROJECT_NAME} INTERFACE )
+
+target_include_directories( ${PROJECT_NAME} INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR} )
+
+target_link_libraries( ${PROJECT_NAME} INTERFACE
+  TubeTKFiltering
+  TubeTKNumerics # Required by AnisotropicDiffusiveSparseRegistrationFilter including itkTubeMath.h
+  )
+
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
 
-install( FILES
-  ${TubeTK_Base_Segmentation_H_Files}
-  ${TubeTK_Base_Segmentation_HXX_Files}
-  DESTINATION include )
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_Segmentation_H_Files}
+    ${TubeTK_Base_Segmentation_HXX_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
+endif()
+
+TubeTKMacroInstallPlugins( ${PROJECT_NAME} )
+
+set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS ${PROJECT_NAME} )

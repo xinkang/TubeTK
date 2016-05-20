@@ -70,10 +70,14 @@ MetaRidgeSeed( const MetaRidgeSeed & _metaRidgeSeed )
 MetaRidgeSeed::
 MetaRidgeSeed(
   const RidgeSeedScalesType & _ridgeSeedScales,
+  bool _useIntensityOnly,
+  bool _useSVM,
   const LDAValuesType & _ldaValues,
   const LDAMatrixType & _ldaMatrix,
-  const ValueListType & _whitenMeans,
-  const ValueListType & _whitenStdDevs,
+  const ValueListType & _inputWhitenMeans,
+  const ValueListType & _inputWhitenStdDevs,
+  const ValueListType & _outputWhitenMeans,
+  const ValueListType & _outputWhitenStdDevs,
   const std::string & _pdfFileName)
 {
   if( META_DEBUG )
@@ -83,8 +87,10 @@ MetaRidgeSeed(
 
   Clear();
 
-  InitializeEssential( _ridgeSeedScales,
-    _ldaValues, _ldaMatrix, _whitenMeans, _whitenStdDevs, _pdfFileName );
+  InitializeEssential( _ridgeSeedScales, _useIntensityOnly, _useSVM,
+    _ldaValues, _ldaMatrix, _inputWhitenMeans,
+    _inputWhitenStdDevs, _outputWhitenMeans, _outputWhitenStdDevs,
+    _pdfFileName );
 }
 
 MetaRidgeSeed::
@@ -104,11 +110,11 @@ PrintInfo() const
   METAIO_STREAM::cout << "PDFFileaName = "
     << m_PDFFileName << METAIO_STREAM::endl;
 
-  METAIO_STREAM::cout << "IntensityMin = " << m_IntensityMin
-    << METAIO_STREAM::endl;
+  METAIO_STREAM::cout << "UseSVM = "
+    << ( m_UseSVM ? "True" : "False" ) << METAIO_STREAM::endl;
 
-  METAIO_STREAM::cout << "IntensityMax = " << m_IntensityMax
-    << METAIO_STREAM::endl;
+  METAIO_STREAM::cout << "UseIntensityOnly = "
+    << ( m_UseIntensityOnly ? "True" : "False" ) << METAIO_STREAM::endl;
 
   METAIO_STREAM::cout << "RidgeId = " << m_RidgeId
     << METAIO_STREAM::endl;
@@ -132,9 +138,9 @@ CopyInfo( const MetaRidgeSeed & _lda )
   MetaLDA::CopyInfo( dynamic_cast< const MetaLDA & >( _lda ) );
 
   SetRidgeSeedScales( _lda.GetRidgeSeedScales() );
+  SetUseIntensityOnly( _lda.GetUseIntensityOnly() );
+  SetUseSVM( _lda.GetUseSVM() );
   SetPDFFileName( _lda.GetPDFFileName() );
-  SetIntensityMin( _lda.GetIntensityMin() );
-  SetIntensityMax( _lda.GetIntensityMax() );
   SetRidgeId( _lda.GetRidgeId() );
   SetUnknownId( _lda.GetUnknownId() );
   SetBackgroundId( _lda.GetBackgroundId() );
@@ -155,10 +161,13 @@ Clear( void )
   strcpy( m_FormTypeName, "RidgeSeed" );
 
   m_RidgeSeedScales.clear();
+
+  m_UseIntensityOnly = false;
+
+  m_UseSVM = false;
+
   m_PDFFileName.clear();
 
-  m_IntensityMin = 0;
-  m_IntensityMax = 0;
   m_RidgeId = 255;
   m_BackgroundId = 127;
   m_UnknownId = 0;
@@ -169,10 +178,14 @@ Clear( void )
 bool MetaRidgeSeed::
 InitializeEssential(
   const RidgeSeedScalesType & _ridgeSeedScales,
+  bool _useIntensityOnly,
+  bool _useSVM,
   const LDAValuesType & _ldaValues,
   const LDAMatrixType & _ldaMatrix,
-  const ValueListType & _whitenMeans,
-  const ValueListType & _whitenStdDevs,
+  const ValueListType & _inputWhitenMeans,
+  const ValueListType & _inputWhitenStdDevs,
+  const ValueListType & _outputWhitenMeans,
+  const ValueListType & _outputWhitenStdDevs,
   const std::string & _pdfFileName )
 {
   if( META_DEBUG )
@@ -181,10 +194,15 @@ InitializeEssential(
       << METAIO_STREAM::endl;
     }
 
-  MetaLDA::InitializeEssential( _ldaValues, _ldaMatrix, _whitenMeans,
-    _whitenStdDevs );
+  MetaLDA::InitializeEssential( 3, 1,
+    _ldaValues, _ldaMatrix, _inputWhitenMeans, _inputWhitenStdDevs,
+    _outputWhitenMeans, _outputWhitenStdDevs );
 
   SetRidgeSeedScales( _ridgeSeedScales );
+
+  SetUseIntensityOnly( _useIntensityOnly );
+
+  SetUseSVM( _useSVM );
 
   SetPDFFileName( _pdfFileName );
 
@@ -216,6 +234,55 @@ GetRidgeSeedScales( void ) const
 }
 
 void MetaRidgeSeed::
+SetUseIntensityOnly( bool _UseIntensityOnly )
+{
+  if( META_DEBUG )
+    {
+    METAIO_STREAM::cout << "MetaRidgeSeed: SetUseIntensityOnly"
+      << METAIO_STREAM::endl;
+    }
+
+  m_UseIntensityOnly = _UseIntensityOnly;
+}
+
+bool MetaRidgeSeed::
+GetUseIntensityOnly( void ) const
+{
+  if( META_DEBUG )
+    {
+    METAIO_STREAM::cout << "MetaRidgeSeed: GetUseIntensityOnly"
+      << METAIO_STREAM::endl;
+    }
+
+  return m_UseIntensityOnly;
+}
+
+void MetaRidgeSeed::
+SetUseSVM( bool _UseSVM )
+{
+  if( META_DEBUG )
+    {
+    METAIO_STREAM::cout << "MetaRidgeSeed: SetUseSVM"
+      << METAIO_STREAM::endl;
+    }
+
+  m_UseSVM = _UseSVM;
+}
+
+bool MetaRidgeSeed::
+GetUseSVM( void ) const
+{
+  if( META_DEBUG )
+    {
+    METAIO_STREAM::cout << "MetaRidgeSeed: GetUseSVM"
+      << METAIO_STREAM::endl;
+    }
+
+  return m_UseSVM;
+}
+
+
+void MetaRidgeSeed::
 SetPDFFileName( const std::string & _pdfFileName )
 {
   if( META_DEBUG )
@@ -237,54 +304,6 @@ GetPDFFileName( void ) const
     }
 
   return m_PDFFileName;
-}
-
-void MetaRidgeSeed::
-SetIntensityMin( double _IntensityMin )
-{
-  if( META_DEBUG )
-    {
-    METAIO_STREAM::cout << "MetaRidgeSeed: SetIntensityMin"
-      << METAIO_STREAM::endl;
-    }
-
-  m_IntensityMin = _IntensityMin;
-}
-
-double MetaRidgeSeed::
-GetIntensityMin( void ) const
-{
-  if( META_DEBUG )
-    {
-    METAIO_STREAM::cout << "MetaRidgeSeed: GetIntensityMin"
-      << METAIO_STREAM::endl;
-    }
-
-  return m_IntensityMin;
-}
-
-void MetaRidgeSeed::
-SetIntensityMax( double _IntensityMax )
-{
-  if( META_DEBUG )
-    {
-    METAIO_STREAM::cout << "MetaRidgeSeed: SetIntensityMax"
-      << METAIO_STREAM::endl;
-    }
-
-  m_IntensityMax = _IntensityMax;
-}
-
-double MetaRidgeSeed::
-GetIntensityMax( void ) const
-{
-  if( META_DEBUG )
-    {
-    METAIO_STREAM::cout << "MetaRidgeSeed: GetIntensityMax"
-      << METAIO_STREAM::endl;
-    }
-
-  return m_IntensityMax;
 }
 
 void MetaRidgeSeed::
@@ -525,8 +544,9 @@ ReadStream( METAIO_STREAM::ifstream * _stream )
 
   m_ReadStream = NULL;
 
-  InitializeEssential( m_RidgeSeedScales,
-    m_LDAValues, m_LDAMatrix, m_WhitenMeans, m_WhitenStdDevs,
+  InitializeEssential( m_RidgeSeedScales, m_UseIntensityOnly,
+    m_UseSVM, m_LDAValues, m_LDAMatrix, m_InputWhitenMeans,
+    m_InputWhitenStdDevs, m_OutputWhitenMeans, m_OutputWhitenStdDevs,
     m_PDFFileName );
 
   return true;
@@ -540,7 +560,7 @@ Write( const char * _headName )
     FileName( _headName );
     }
 
-  MET_SetFileSuffix( m_FileName, "mrs" );
+  MET_SetFileSuffix( m_FileName, ".mrs" );
 
   METAIO_STREAM::ofstream * tmpWriteStream = new METAIO_STREAM::ofstream;
 
@@ -552,6 +572,8 @@ Write( const char * _headName )
     delete tmpWriteStream;
     return false;
     }
+
+  tmpWriteStream->precision( 10 );
 
   const bool result = WriteStream( tmpWriteStream );
 
@@ -622,15 +644,15 @@ M_SetupReadFields( void )
   m_Fields.push_back( mF );
 
   mF = new MET_FieldRecordType;
+  MET_InitReadField( mF, "UseIntensityOnly", MET_STRING, true );
+  m_Fields.push_back( mF );
+
+  mF = new MET_FieldRecordType;
+  MET_InitReadField( mF, "UseSVM", MET_STRING, true );
+  m_Fields.push_back( mF );
+
+  mF = new MET_FieldRecordType;
   MET_InitReadField( mF, "PDFFileName", MET_STRING, true );
-  m_Fields.push_back( mF );
-
-  mF = new MET_FieldRecordType;
-  MET_InitReadField( mF, "IntensityMin", MET_FLOAT, true );
-  m_Fields.push_back( mF );
-
-  mF = new MET_FieldRecordType;
-  MET_InitReadField( mF, "IntensityMax", MET_FLOAT, true );
   m_Fields.push_back( mF );
 
   mF = new MET_FieldRecordType;
@@ -679,16 +701,30 @@ M_SetupWriteFields( void )
     m_Fields.push_back( mF );
 
     mF = new MET_FieldRecordType;
+    if( m_UseIntensityOnly )
+      {
+      MET_InitWriteField( mF, "UseIntensityOnly", MET_STRING, 4, "True" );
+      }
+    else
+      {
+      MET_InitWriteField( mF, "UseIntensityOnly", MET_STRING, 5, "False" );
+      }
+    m_Fields.push_back( mF );
+
+    mF = new MET_FieldRecordType;
+    if( m_UseSVM )
+      {
+      MET_InitWriteField( mF, "UseSVM", MET_STRING, 4, "True" );
+      }
+    else
+      {
+      MET_InitWriteField( mF, "UseSVM", MET_STRING, 5, "False" );
+      }
+    m_Fields.push_back( mF );
+
+    mF = new MET_FieldRecordType;
     MET_InitWriteField( mF, "PDFFileName", MET_STRING,
       m_PDFFileName.size(), m_PDFFileName.c_str() );
-    m_Fields.push_back( mF );
-
-    mF = new MET_FieldRecordType;
-    MET_InitWriteField( mF, "IntensityMin", MET_FLOAT, m_IntensityMin );
-    m_Fields.push_back( mF );
-
-    mF = new MET_FieldRecordType;
-    MET_InitWriteField( mF, "IntensityMax", MET_FLOAT, m_IntensityMax );
     m_Fields.push_back( mF );
 
     mF = new MET_FieldRecordType;
@@ -766,14 +802,30 @@ M_Read( void )
       }
     }
 
+  mF = MET_GetFieldRecord( "UseIntensityOnly", &m_Fields );
+  if( (( char * )( mF->value ))[0] == 'T'
+    || (( char * )( mF->value)) [0] == 't' )
+    {
+    m_UseIntensityOnly = true;
+    }
+  else
+    {
+    m_UseIntensityOnly = false;
+    }
+
+  mF = MET_GetFieldRecord( "UseSVM", &m_Fields );
+  if( (( char * )( mF->value ))[0] == 'T'
+    || (( char * )( mF->value)) [0] == 't' )
+    {
+    m_UseSVM = true;
+    }
+  else
+    {
+    m_UseSVM = false;
+    }
+
   mF = MET_GetFieldRecord( "PDFFileName", &m_Fields );
   m_PDFFileName = ( char * )( &(mF->value[0]) );
-
-  mF = MET_GetFieldRecord( "IntensityMin", &m_Fields );
-  m_IntensityMin = (double)( mF->value[0] );
-
-  mF = MET_GetFieldRecord( "IntensityMax", &m_Fields );
-  m_IntensityMax = (double)( mF->value[0] );
 
   mF = MET_GetFieldRecord( "RidgeId", &m_Fields );
   m_RidgeId = (int)( mF->value[0] );

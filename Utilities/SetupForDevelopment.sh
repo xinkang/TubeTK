@@ -32,5 +32,6 @@ Utilities/GitSetup/tips
 # Rebase master by default
 git config rebase.stat true
 git config branch.master.rebase true
-git config hooks.KWStyle.conf "${src_dir}/CMake/KWStyle/KWStyle.kws.xml.in"
-git config hooks.KWStyle.overwriteRulesConf "${src_dir}/CMake/KWStyle/KWStyle.Overwrite.txt.in"
+git config hooks.KWStyle.conf "CMake/KWStyle/KWStyle.kws.xml"
+git config hooks.KWStyle.overwriteRulesConf "CMake/KWStyle/KWStyle.Overwrite.txt"
+git config hooks.uncrustify.conf "CMake/Uncrustify/TubeTK.cfg"

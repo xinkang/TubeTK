@@ -21,14 +21,6 @@
 #
 ##############################################################################
 
-# Make sure this file is included only once.
-get_filename_component( CMAKE_CURRENT_LIST_FILENAME ${CMAKE_CURRENT_LIST_FILE}
-  NAME_WE )
-if( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-  return()
-endif( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED )
-set( ${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED 1 )
-
 set( proj VTK )
 
 # Sanity checks.
@@ -36,10 +28,15 @@ if( DEFINED ${proj}_DIR AND NOT EXISTS ${${proj}_DIR} )
   message( FATAL_ERROR "${proj}_DIR variable is defined but corresponds to a nonexistent directory" )
 endif( DEFINED ${proj}_DIR AND NOT EXISTS ${${proj}_DIR} )
 
-set( ${proj}_DEPENDENCIES "" )
+if( TubeTK_USE_JsonCpp )
+  set( ${proj}_DEPENDENCIES "JsonCpp" )
+  set( ${proj}_DEPENDENCIES_ARGS "-DJsonCpp_DIR:PATH=${JsonCpp_DIR}"
+    "-DJsonCpp_LIBRARIES:PATH=${JsonCpp_LIBRARIES}"
+    "-DJsonCpp_INCLUDE_DIRS:PATH=${JsonCpp_INCLUDE_DIRS}" )
+endif( TubeTK_USE_JsonCpp )
 
 # Include dependent projects, if any.
-TubeTKMacroCheckExternalProjectDependency( ${proj} )
+ExternalProject_Include_Dependencies(${proj} PROJECT_VAR proj DEPENDS_VAR ${proj}_DEPENDENCIES)
 
 if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
   set( ${proj}_SOURCE_DIR ${CMAKE_BINARY_DIR}/${proj} )
@@ -49,8 +46,7 @@ if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
   if( TubeTK_USE_QT )
     set( ${proj}_QT_ARGS
       -DQT_QMAKE_EXECUTABLE:FILEPATH=${QT_QMAKE_EXECUTABLE}
-      -DVTK_USE_QT:BOOL=ON
-      -DVTK_USE_QVTK_QTOPENGL:BOOL=ON )
+      -DVTK_Group_Qt:BOOL=ON )
   endif( TubeTK_USE_QT )
 
   set( TubeTK_VTKHDF5_VALGRIND_ARGS )
@@ -75,6 +71,7 @@ if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
 
 
   ExternalProject_Add( ${proj}
+    ${${proj}_EP_ARGS}
     GIT_REPOSITORY ${${proj}_URL}
     GIT_TAG ${${proj}_HASH_OR_TAG}
     DOWNLOAD_DIR ${${proj}_SOURCE_DIR}
@@ -89,6 +86,7 @@ if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
     LOG_INSTALL 0
     CMAKE_GENERATOR ${gen}
     CMAKE_ARGS
+      -Wno-dev
       -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
       -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
       -DCMAKE_C_FLAGS:STRING=${CMAKE_C_FLAGS}
@@ -101,18 +99,18 @@ if( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
       -DBUILD_EXAMPLES:BOOL=OFF
       -DBUILD_TESTING:BOOL=OFF
       -DVTK_LEGACY_REMOVE:BOOL=ON
-      -DVTK_USE_GUISUPPORT:BOOL=ON
-      -DVTK_USE_PARALLEL:BOOL=ON
       ${${proj}_QT_ARGS}
       ${TubeTK_VTKHDF5_VALGRIND_ARGS}
-    INSTALL_COMMAND "" )
+    INSTALL_COMMAND ""
+    DEPENDS
+      ${${proj}_DEPENDENCIES} )
 
 else( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
   if( ${USE_SYSTEM_${proj}} )
     find_package( ${proj} REQUIRED )
   endif( ${USE_SYSTEM_${proj}} )
 
-  TubeTKMacroEmptyExternalProject( ${proj} "${${proj}_DEPENDENCIES}" )
+  ExternalProject_Add_Empty( ${proj} DEPENDS ${${proj}_DEPENDENCIES} )
 endif( NOT DEFINED ${proj}_DIR AND NOT ${USE_SYSTEM_${proj}} )
 
 list( APPEND TubeTK_EXTERNAL_PROJECTS_ARGS -D${proj}_DIR:PATH=${${proj}_DIR} )

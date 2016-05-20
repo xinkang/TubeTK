@@ -30,7 +30,8 @@ int itktubeRidgeSeedFilterTest( int argc, char * argv[] )
     std::cerr << "Missing arguments." << std::endl;
     std::cerr << "Usage: " << std::endl;
     std::cerr << argv[0]
-      << " inputImage labelmapImage objId bkgId outputClass0PDF outputFeature0Image outputImage maxScaleImage"
+      << " inputImage labelmapImage objId bkgId useSVM outputFeature0Image"
+      << " outputImage maxScaleImage"
       << std::endl;
     return EXIT_FAILURE;
     }
@@ -46,14 +47,10 @@ int itktubeRidgeSeedFilterTest( int argc, char * argv[] )
 
   // Declare the reader and writer
   typedef itk::ImageFileReader< ImageType > ReaderType;
-  typedef itk::ImageFileWriter< ImageType > WriterType;
 
   typedef itk::Image< unsigned char, Dimension >    LabelMapType;
   typedef itk::ImageFileReader< LabelMapType >      LabelMapReaderType;
   typedef itk::ImageFileWriter< LabelMapType >      LabelMapWriterType;
-
-  typedef itk::Image< float, 3 >                    PDFImageType;
-  typedef itk::ImageFileWriter< PDFImageType >      PDFImageWriterType;
 
   typedef itk::Image< float, Dimension >            FeatureImageType;
   typedef itk::ImageFileWriter< FeatureImageType >  FeatureImageWriterType;
@@ -91,9 +88,10 @@ int itktubeRidgeSeedFilterTest( int argc, char * argv[] )
     }
   LabelMapType::Pointer labelmapImage = mReader->GetOutput();
 
-  FilterType::RidgeScalesType scales(2);
-  scales[0] = 0.15;
-  scales[1] = 0.5;
+  FilterType::RidgeScalesType scales(3);
+  scales[0] = 0.35;
+  scales[1] = 0.7;
+  scales[2] = 1.05;
 
   FilterType::Pointer filter = FilterType::New();
   filter->SetInput( inputImage );
@@ -101,37 +99,35 @@ int itktubeRidgeSeedFilterTest( int argc, char * argv[] )
   filter->SetScales( scales );
   int objId = atoi( argv[3] );
   int bkgId = atoi( argv[4] );
+  if( argv[5][0] == 't' || argv[5][0] == 'T' )
+    {
+    filter->SetUseSVM( true );
+    filter->SetSVMTrainingDataStride( 100 );
+    }
   filter->SetRidgeId( objId );
   filter->SetBackgroundId( bkgId );
   filter->SetUnknownId( 0 );
-  std::cout << filter << std::endl;
-  filter->Update();
+  filter->SetTrainClassifier( true );
+  std::cout << "Update started." << std::endl;
+  try
+    {
+    filter->Update();
+    }
+  catch( ... )
+    {
+    std::cout << "Error in RidgeSeedFilter update." << std::endl;
+    }
   std::cout << "Update done." << std::endl;
 
   filter->ClassifyImages();
   std::cout << "Classification done." << std::endl;
 
-  PDFImageWriterType::Pointer pdfImageWriter = PDFImageWriterType::New();
-  pdfImageWriter->SetFileName( argv[5] );
-  pdfImageWriter->SetUseCompression( true );
-  pdfImageWriter->SetInput( filter->GetPDFSegmenter()->
-    GetClassPDFImage( 0 ) );
-  try
-    {
-    pdfImageWriter->Update();
-    }
-  catch (itk::ExceptionObject& e)
-    {
-    std::cerr << "Exception caught during write:" << std::endl << e;
-    return EXIT_FAILURE;
-    }
-
   FeatureImageWriterType::Pointer feature2ImageWriter =
     FeatureImageWriterType::New();
   feature2ImageWriter->SetFileName( argv[6] );
   feature2ImageWriter->SetUseCompression( true );
-  feature2ImageWriter->SetInput( filter->GetRidgeFeatureGenerator()->
-    GetFeatureImage( 0 ) );
+  feature2ImageWriter->SetInput( filter->GetRidgeFeatureGenerator()
+    ->GetFeatureImage( 0 ) );
   try
     {
     feature2ImageWriter->Update();

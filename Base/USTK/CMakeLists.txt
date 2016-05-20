@@ -21,10 +21,7 @@
 #
 ##############################################################################
 
-project( TubeUSTK )
-
-find_package( ITK REQUIRED )
-include( ${ITK_USE_FILE} )
+project( TubeTKUSTK )
 
 set( TubeTK_Base_USTK_H_Files
   itkAcousticImpulseResponseImageFilter.h
@@ -52,22 +49,28 @@ set( TubeTK_Base_USTK_SRCS
   SyncRecordManager.cpp
   itktubeInnerOpticToPlusImageReader.cxx )
 
-add_library( TubeTKUSTK STATIC
+add_library( ${PROJECT_NAME} STATIC
   ${TubeTK_Base_USTK_H_Files}
   ${TubeTK_Base_USTK_HXX_Files}
   ${TubeTK_Base_USTK_SRCS} )
 
-set( TARGETS TubeTKUSTK )
-TubeTKMacroInstallPlugins( ${TARGETS} )
+target_link_libraries( ${PROJECT_NAME} PUBLIC TubeTKSegmentation )
 
-if( BUILD_TESTING )
+target_include_directories( ${PROJECT_NAME} PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR} )
+
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
 
-install( FILES
-  ${TubeTK_Base_USTK_H_Files}
-  ${TubeTK_Base_USTK_HXX_Files}
-  DESTINATION include )
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_USTK_H_Files}
+    ${TubeTK_Base_USTK_HXX_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
 
-# Export target
-set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS TubeTKUSTK )
+  TubeTKMacroInstallPlugins( ${PROJECT_NAME} )
+endif()
+
+set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS ${PROJECT_NAME} )

@@ -55,9 +55,8 @@ MarkDuplicateFramesInvalidImageFilterThreader< TAssociate >
 ::ThreadedExecution( const DomainType & regionForThread,
   const ThreadIdType threadId )
 {
-  typedef typename AssociateType::InputImageType InputImageType;
-  typedef typename AssociateType::InputImageRegionType
-    InputImageRegionType;
+  typedef typename AssociateType::InputImageType       InputImageType;
+  typedef typename AssociateType::InputImageRegionType InputImageRegionType;
 
   const InputImageType * inputImage = this->m_Associate->GetInput();
   const InputImageRegionType largestRegion =
@@ -110,7 +109,7 @@ MarkDuplicateFramesInvalidImageFilterThreader< TAssociate >
       while( !currentSliceIt.IsAtEndOfLine() )
         {
         const float absDifference =
-          vcl_abs( static_cast< float >( currentSliceIt.Get() ) -
+          std::abs( static_cast< float >( currentSliceIt.Get() ) -
             static_cast< float >( nextSliceIt.Get() ) );
         if( absDifference <= tolerance )
           {
@@ -156,8 +155,8 @@ MarkDuplicateFramesInvalidImageFilterThreader< TAssociate >
       keyPrefix.width( 4 );
       keyPrefix << *invalidIt;
       EncapsulateMetaData< std::string >( newDictionary,
-                                          keyPrefix.str() + "_ProbeToTrackerTransformStatus",
-                                          std::string( "INVALID" ) );
+        keyPrefix.str() + "_ProbeToTrackerTransformStatus",
+        std::string( "INVALID" ) );
       }
     }
   DataObject * outputDataObject =

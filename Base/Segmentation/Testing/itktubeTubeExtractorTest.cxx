@@ -21,6 +21,7 @@ limitations under the License.
 
 =========================================================================*/
 
+#include "tubeTubeMath.h"
 #include "itktubeTubeExtractor.h"
 
 #include <itkImageFileReader.h>
@@ -28,7 +29,7 @@ limitations under the License.
 #include <itkSpatialObjectReader.h>
 
 int itktubeTubeExtractorTest( int argc, char * argv[] )
-  {
+{
   if( argc != 3 )
     {
     std::cout << "itktubeTubeExtractorTest <inputImage> <vessel.tre>"
@@ -56,7 +57,6 @@ int itktubeTubeExtractorTest( int argc, char * argv[] )
   typedef itk::GroupSpatialObject<>                    GroupType;
   typedef itk::VesselTubeSpatialObject<>               TubeType;
   typedef TubeType::PointListType                      PointListType;
-  typedef TubeType::PointType                          PointType;
   typedef TubeType::TubePointType                      TubePointType;
 
   ReaderType::Pointer reader = ReaderType::New();
@@ -175,8 +175,8 @@ int itktubeTubeExtractorTest( int argc, char * argv[] )
     TubeOpType::ContinuousIndexType x1 = x0;
     tubeOp->SetDebug( true );
     tubeOp->GetRidgeOp()->SetDebug( true );
-    //tubeOp->GetRadiusOp()->SetDebug( true );
-    if( !tubeOp->LocalTube( x1 ) )
+    tubeOp->GetRadiusOp()->SetDebug( true );
+    if( tubeOp->LocalTube( x1 ) != TubeOpType::RidgeOpType::SUCCESS )
       {
       std::cout << "Local tube test failed.  No tube found." << std::endl;
       std::cout << "   Source = " << x0 << std::endl;
@@ -191,7 +191,7 @@ int itktubeTubeExtractorTest( int argc, char * argv[] )
       double tf = x0[i]-x1[i];
       diff += tf * tf;
       }
-    diff = vcl_sqrt( diff );
+    diff = std::sqrt( diff );
     if( diff > 2 )
       {
       std::cout << "Local tube test failed.  Local tube too far."
@@ -261,7 +261,7 @@ int itktubeTubeExtractorTest( int argc, char * argv[] )
       }
 
     std::cout << "***** Attempting smooth tube *****" << std::endl;
-    tubeOp->SmoothTube( xTube, 5 );
+    xTube = ::tube::SmoothTube< TubeType >( xTube, 5 );
 
     std::cout << "***** Attempting add tube *****" << std::endl;
     if( !tubeOp->AddTube( xTube ) )
@@ -306,4 +306,4 @@ int itktubeTubeExtractorTest( int argc, char * argv[] )
     }
 
   return EXIT_SUCCESS;
-  }
+}

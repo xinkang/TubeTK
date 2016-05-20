@@ -20,10 +20,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 =========================================================================*/
+#ifndef __itktubeRidgeSeedFilterIO_hxx
+#define __itktubeRidgeSeedFilterIO_hxx
 
 #include "itktubeRidgeSeedFilterIO.h"
-
-#include "itktubePDFSegmenterIO.h"
+#include "itktubePDFSegmenterParzenIO.h"
+#include "itktubePDFSegmenterSVMIO.h"
 
 namespace itk
 {
@@ -64,7 +66,8 @@ RidgeSeedFilterIO< TImage, TLabelMap >::
 }
 
 template< class TImage, class TLabelMap >
-void RidgeSeedFilterIO< TImage, TLabelMap >::
+void RidgeSeedFilterIO< TImage,
+  TLabelMap >::
 PrintInfo() const
 {
   if( m_RidgeSeedFilter.IsNotNull() )
@@ -78,7 +81,8 @@ PrintInfo() const
 }
 
 template< class TImage, class TLabelMap >
-void RidgeSeedFilterIO< TImage, TLabelMap >::
+void RidgeSeedFilterIO< TImage,
+  TLabelMap >::
 CopyInfo( const RidgeSeedFilterIOType & _filterIO )
 {
   Clear();
@@ -87,7 +91,8 @@ CopyInfo( const RidgeSeedFilterIOType & _filterIO )
 }
 
 template< class TImage, class TLabelMap >
-void RidgeSeedFilterIO< TImage, TLabelMap >::
+void RidgeSeedFilterIO< TImage,
+  TLabelMap >::
 Clear( void )
 {
   m_RidgeSeedFilter = NULL;
@@ -105,7 +110,8 @@ InitializeEssential( const typename
 }
 
 template< class TImage, class TLabelMap >
-void RidgeSeedFilterIO< TImage, TLabelMap >::
+void RidgeSeedFilterIO< TImage,
+  TLabelMap >::
 SetRidgeSeedFilter( const typename
   RidgeSeedFilterType::Pointer & _filter )
 {
@@ -125,15 +131,16 @@ bool RidgeSeedFilterIO< TImage, TLabelMap >::
 CanRead( const char * _headerName ) const
 {
   MetaRidgeSeed seedReader;
-  MetaClassPDF  pdfReader;
 
   std::string pdfName = _headerName;
   pdfName = pdfName + ".mpd";
+  char pdfPath[255];
+  MET_GetFilePath( _headerName, pdfPath );
+  pdfName = pdfPath + pdfName;
 
   bool result = seedReader.CanRead( _headerName );
-  bool result2 = pdfReader.CanRead( pdfName.c_str() );
 
-  if( result && result2 )
+  if( result )
     {
     return true;
     }
@@ -161,8 +168,12 @@ Read( const char * _headerName )
     }
 
   m_RidgeSeedFilter->SetScales( seedReader.GetRidgeSeedScales() );
-  m_RidgeSeedFilter->SetIntensityMin( seedReader.GetIntensityMin() );
-  m_RidgeSeedFilter->SetIntensityMax( seedReader.GetIntensityMax() );
+
+  m_RidgeSeedFilter->SetUseIntensityOnly(
+    seedReader.GetUseIntensityOnly() );
+
+  m_RidgeSeedFilter->SetUseSVM( seedReader.GetUseSVM() );
+
   m_RidgeSeedFilter->SetRidgeId( seedReader.GetRidgeId() );
   m_RidgeSeedFilter->SetBackgroundId( seedReader.GetBackgroundId() );
   m_RidgeSeedFilter->SetUnknownId( seedReader.GetUnknownId() );
@@ -171,16 +182,77 @@ Read( const char * _headerName )
 
   m_RidgeSeedFilter->SetBasisValues( seedReader.GetLDAValues() );
   m_RidgeSeedFilter->SetBasisMatrix( seedReader.GetLDAMatrix() );
-  m_RidgeSeedFilter->SetWhitenMeans( seedReader.GetWhitenMeans() );
-  m_RidgeSeedFilter->SetWhitenStdDevs( seedReader.GetWhitenStdDevs() );
+  m_RidgeSeedFilter->SetInputWhitenMeans( seedReader.
+    GetInputWhitenMeans() );
+  m_RidgeSeedFilter->SetInputWhitenStdDevs( seedReader.
+    GetInputWhitenStdDevs() );
+  m_RidgeSeedFilter->SetOutputWhitenMeans( seedReader.
+    GetOutputWhitenMeans() );
+  m_RidgeSeedFilter->SetOutputWhitenStdDevs( seedReader.
+    GetOutputWhitenStdDevs() );
 
-  PDFSegmenterIO< TImage, 3, TLabelMap > pdfReader(
-    m_RidgeSeedFilter->GetPDFSegmenter() );
+  m_RidgeSeedFilter->SetTrainClassifier( false );
+  m_RidgeSeedFilter->Update();
+
   std::string pdfFileName = seedReader.GetPDFFileName();
-  if( !pdfReader.Read( pdfFileName.c_str() ) )
+  char pdfPath[255];
+  MET_GetFilePath( _headerName, pdfPath );
+  pdfFileName = pdfPath + pdfFileName;
+
+  if( !m_RidgeSeedFilter->GetUseSVM() )
     {
-    m_RidgeSeedFilter = NULL;
-    return false;
+    typedef PDFSegmenterParzen< TImage, TLabelMap > PDFSegmenterParzenType;
+    typename PDFSegmenterParzenType::Pointer pdfParzen =
+      PDFSegmenterParzenType::New();
+    pdfParzen = dynamic_cast< PDFSegmenterParzenType * >(
+      m_RidgeSeedFilter->GetPDFSegmenter().GetPointer() );
+    if( pdfParzen.IsNotNull() )
+      {
+      PDFSegmenterParzenIO< TImage, TLabelMap > pdfReader(
+        pdfParzen.GetPointer() );
+      if( !pdfReader.Read( pdfFileName.c_str() ) )
+        {
+        std::cerr << "Cannot read Parzen file: " << pdfFileName
+          << std::endl;
+        m_RidgeSeedFilter = NULL;
+        return false;
+        }
+      }
+    else
+      {
+      std::cerr << "File defines Parzen PDF, RidgeSeedFilter uses SVM PDF:"
+        << pdfFileName << std::endl;
+      std::cerr << m_RidgeSeedFilter->GetPDFSegmenter() << std::endl;
+      m_RidgeSeedFilter = NULL;
+      return false;
+      }
+    }
+  else
+    {
+    typedef PDFSegmenterSVM< TImage, TLabelMap >    PDFSegmenterSVMType;
+    typename PDFSegmenterSVMType::Pointer pdfSVM =
+      PDFSegmenterSVMType::New();
+    pdfSVM = dynamic_cast< PDFSegmenterSVMType * >( m_RidgeSeedFilter->
+        GetPDFSegmenter().GetPointer() );
+    if( pdfSVM.IsNotNull() )
+      {
+      PDFSegmenterSVMIO< TImage, TLabelMap > pdfReader(
+        pdfSVM.GetPointer() );
+      if( !pdfReader.Read( pdfFileName.c_str() ) )
+        {
+        std::cerr << "Cannot read SVM file: " << pdfFileName << std::endl;
+        m_RidgeSeedFilter = NULL;
+        return false;
+        }
+      }
+    else
+      {
+      std::cerr << "File defines SVM PDF, RidgeSeedFilter uses Parzen PDF:"
+        << pdfFileName << std::endl;
+      std::cerr << m_RidgeSeedFilter->GetPDFSegmenter() << std::endl;
+      m_RidgeSeedFilter = NULL;
+      return false;
+      }
     }
 
   return true;
@@ -197,36 +269,87 @@ Write( const char * _headerName )
 
   MetaRidgeSeed seedWriter;
 
-  seedWriter.SetLDAValues( m_RidgeSeedFilter->GetBasisValues() );
-  seedWriter.SetLDAMatrix( m_RidgeSeedFilter->GetBasisMatrix() );
-  seedWriter.SetWhitenMeans( m_RidgeSeedFilter->GetWhitenMeans() );
-  seedWriter.SetWhitenStdDevs( m_RidgeSeedFilter->GetWhitenStdDevs() );
   seedWriter.SetRidgeSeedScales( m_RidgeSeedFilter->GetScales() );
-  seedWriter.SetUnknownId( m_RidgeSeedFilter->GetUnknownId() );
-  seedWriter.SetBackgroundId( m_RidgeSeedFilter->GetBackgroundId() );
+
+  seedWriter.SetUseIntensityOnly(
+    m_RidgeSeedFilter->GetUseIntensityOnly() );
+
+  seedWriter.SetUseSVM( m_RidgeSeedFilter->GetUseSVM() );
+
   seedWriter.SetRidgeId( m_RidgeSeedFilter->GetRidgeId() );
-  seedWriter.SetIntensityMin( m_RidgeSeedFilter->GetIntensityMin() );
-  seedWriter.SetIntensityMax( m_RidgeSeedFilter->GetIntensityMax() );
+  seedWriter.SetBackgroundId( m_RidgeSeedFilter->GetBackgroundId() );
+  seedWriter.SetUnknownId( m_RidgeSeedFilter->GetUnknownId() );
   seedWriter.SetSeedTolerance( m_RidgeSeedFilter->GetSeedTolerance() );
   seedWriter.SetSkeletonize( m_RidgeSeedFilter->GetSkeletonize() );
 
-  std::string pdfName = _headerName;
+  seedWriter.SetNumberOfPCABasisToUseAsFeatures( 3 );
+  seedWriter.SetNumberOfLDABasisToUseAsFeatures( 1 );
+
+  seedWriter.SetLDAValues( m_RidgeSeedFilter->GetBasisValues() );
+  seedWriter.SetLDAMatrix( m_RidgeSeedFilter->GetBasisMatrix() );
+  seedWriter.SetInputWhitenMeans( m_RidgeSeedFilter->
+    GetInputWhitenMeans() );
+  seedWriter.SetInputWhitenStdDevs( m_RidgeSeedFilter->
+    GetInputWhitenStdDevs() );
+  seedWriter.SetOutputWhitenMeans( m_RidgeSeedFilter->
+    GetOutputWhitenMeans() );
+  seedWriter.SetOutputWhitenStdDevs( m_RidgeSeedFilter->
+    GetOutputWhitenStdDevs() );
+
+  char fileName[255];
+  MET_GetFilePath( _headerName, fileName );
+  int skip = strlen( fileName );
+  std::string pdfName = &(_headerName[skip]);
+
   pdfName = pdfName + ".mpd";
 
   seedWriter.SetPDFFileName(  pdfName.c_str() );
 
-  PDFSegmenterIO< TImage, 3, TLabelMap > pdfWriter(
-    m_RidgeSeedFilter->GetPDFSegmenter() );
+  char pdfPath[255];
+  MET_GetFilePath( _headerName, pdfPath );
+  std::string pdfWriteName = pdfPath + pdfName;
 
-  if( !seedWriter.Write( _headerName ) ||
-    !pdfWriter.Write( pdfName.c_str() ) )
+  bool result = true;
+
+  typedef PDFSegmenterParzen< TImage, TLabelMap > PDFSegmenterParzenType;
+  typename PDFSegmenterParzenType::Pointer pdfParzen =
+    PDFSegmenterParzenType::New();
+  pdfParzen = dynamic_cast< PDFSegmenterParzenType * >( m_RidgeSeedFilter->
+      GetPDFSegmenter().GetPointer() );
+  if( pdfParzen.IsNotNull() )
     {
-    return false;
+    PDFSegmenterParzenIO< TImage, TLabelMap > pdfWriter(
+      pdfParzen.GetPointer() );
+    if( !pdfWriter.Write( pdfWriteName.c_str() ) )
+      {
+      result = false;
+      }
+    }
+  else
+    {
+    typedef PDFSegmenterSVM< TImage, TLabelMap >    PDFSegmenterSVMType;
+    typename PDFSegmenterSVMType::Pointer pdfSVM =
+      PDFSegmenterSVMType::New();
+    pdfSVM = dynamic_cast< PDFSegmenterSVMType * >( m_RidgeSeedFilter->
+        GetPDFSegmenter().GetPointer() );
+    if( pdfSVM.IsNotNull() )
+      {
+      PDFSegmenterSVMIO< TImage, TLabelMap > pdfWriter(
+        pdfSVM.GetPointer() );
+      if( !pdfWriter.Write( pdfWriteName.c_str() ) )
+        {
+        result = false;
+        }
+      }
     }
 
-  return true;
+  result = seedWriter.Write( _headerName );
+
+  return result;
 }
 
 } // End namespace tube
 
 } // End namespace itk
+
+#endif // __itktubeRidgeSeedFilterIO_hxx

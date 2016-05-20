@@ -30,7 +30,7 @@ limitations under the License.
 #define __itktubeRidgeExtractor_h
 
 #include "itktubeBlurImageFunction.h"
-#include "itktubeRadiusExtractor.h"
+#include "itktubeRadiusExtractor2.h"
 #include "tubeBrentOptimizer1D.h"
 #include "tubeSplineApproximation1D.h"
 #include "tubeSplineND.h"
@@ -91,18 +91,25 @@ public:
                                                 ContinuousIndexType;
 
   /** Defines the type of vectors used */
-  typedef vnl_vector< double >                  VectorType;
+  typedef vnl_vector< unsigned int >            IntVectorType;
 
+  /** Defines the type of vectors used */
+  typedef vnl_vector< double >                  VectorType;
 
   /** Defines the type of matrix used */
   typedef vnl_matrix< double >                  MatrixType;
 
   /** Tube SpatialObject typedefs */
   typedef VesselTubeSpatialObject< TInputImage::ImageDimension > TubeType;
-  typedef typename TubeType::TubePointType                       TubePointType;
+
+  typedef typename TubeType::TubePointType      TubePointType;
 
   /** Defines the type of vectors used */
   typedef typename TubeType::CovariantVectorType CovariantVectorType;
+
+  typedef enum { SUCCESS, EXITED_IMAGE, REVISITED_VOXEL, RIDGE_FAIL,
+    ROUND_FAIL, CURVE_FAIL, LEVEL_FAIL, TANGENT_FAIL, DISTANCE_FAIL,
+    OTHER_FAIL }                                FailureCodeEnum;
 
   /** Set the input image */
   void SetInputImage( typename ImageType::Pointer inputImage );
@@ -112,6 +119,9 @@ public:
 
   /** Get the mask image */
   itkGetObjectMacro( TubeMaskImage, TubeMaskImageType );
+
+  /** Set the mask image */
+  itkSetObjectMacro( TubeMaskImage, TubeMaskImageType );
 
   /** Set Data Minimum */
   void SetDataMin( double dataMin );
@@ -132,70 +142,64 @@ public:
   itkGetMacro( StepX, double );
 
   /** Set Tangent change threshold */
-  itkSetMacro( ThreshT, double );
+  itkSetMacro( MaxTangentChange, double );
 
   /** Get Tangent change threshold */
-  itkGetMacro( ThreshT, double );
+  itkGetMacro( MaxTangentChange, double );
 
   /** Set Spatial change threshold */
-  itkSetMacro( ThreshX, double );
+  itkSetMacro( MaxXChange, double );
 
   /** Get Spatial change threshold */
-  itkGetMacro( ThreshX, double );
+  itkGetMacro( MaxXChange, double );
 
   /** Set Ridgeness Threshold */
-  itkSetMacro( ThreshRidgeness, double );
+  itkSetMacro( MinRidgeness, double );
 
   /** Get Ridgeness Threshold */
-  itkGetMacro( ThreshRidgeness, double );
+  itkGetMacro( MinRidgeness, double );
 
   /** Set Ridgeness start Threshold */
-  itkSetMacro( ThreshRidgenessStart, double );
+  itkSetMacro( MinRidgenessStart, double );
 
   /** Get Ridgeness start Threshold */
-  itkGetMacro( ThreshRidgenessStart, double );
+  itkGetMacro( MinRidgenessStart, double );
 
   /** Set Roundness Threshold */
-  itkSetMacro( ThreshRoundness, double );
+  itkSetMacro( MinRoundness, double );
 
   /** Get Roundness Threshold */
-  itkGetMacro( ThreshRoundness, double );
+  itkGetMacro( MinRoundness, double );
 
   /** Set Roundness start Threshold */
-  itkSetMacro( ThreshRoundnessStart, double );
+  itkSetMacro( MinRoundnessStart, double );
 
   /** Get Roundness start Threshold */
-  itkGetMacro( ThreshRoundnessStart, double );
-
-  /** Set Curvature  Normalization Factor (multiplier for curvature) */
-  itkSetMacro( CurvatureExpectedMax, double );
-
-  /** Get Curvature  Normalization Factor */
-  itkGetMacro( CurvatureExpectedMax, double );
+  itkGetMacro( MinRoundnessStart, double );
 
   /** Set Curvature  Threshold */
-  itkSetMacro( ThreshCurvature, double );
+  itkSetMacro( MinCurvature, double );
 
   /** Get Curvature  Threshold */
-  itkGetMacro( ThreshCurvature, double );
+  itkGetMacro( MinCurvature, double );
 
   /** Set Curvature  Threshold */
-  itkSetMacro( ThreshCurvatureStart, double );
+  itkSetMacro( MinCurvatureStart, double );
 
   /** Get Curvature  Threshold */
-  itkGetMacro( ThreshCurvatureStart, double );
+  itkGetMacro( MinCurvatureStart, double );
 
-  /** Set Linearity  Threshold */
-  itkSetMacro( ThreshLinearity, double );
+  /** Set Levelness  Threshold */
+  itkSetMacro( MinLevelness, double );
 
-  /** Get Linearity  Threshold */
-  itkGetMacro( ThreshLinearity, double );
+  /** Get Levelness  Threshold */
+  itkGetMacro( MinLevelness, double );
 
-  /** Set Linearity  Threshold */
-  itkSetMacro( ThreshLinearityStart, double );
+  /** Set Levelness  Threshold */
+  itkSetMacro( MinLevelnessStart, double );
 
-  /** Get Linearity  Threshold */
-  itkGetMacro( ThreshLinearityStart, double );
+  /** Get Levelness  Threshold */
+  itkGetMacro( MinLevelnessStart, double );
 
 
   /** Set Extract Bound Minimum */
@@ -226,24 +230,34 @@ public:
   double GetScale( void );
 
   /** Set the extent */
-  void SetExtent( double extent );
+  void SetScaleKernelExtent( double extent );
 
   /** Get the extent */
-  double GetExtent( void );
+  double GetScaleKernelExtent( void );
 
-  /** Set the dynamic Scale */
+  /** Set to re-estimate (based on local radius estimate) the scale to be
+   * used for image measures made during ridge extraction */
   void SetDynamicScale( bool dynamicScale );
 
-  /** Get the dynamicScale */
+  /** Is the scale of ridge measures optimized during ridge traversal */
   itkGetMacro( DynamicScale, bool );
 
+  /** Get the scale currently being used for ridge traversal measures. */
   itkGetMacro( DynamicScaleUsed, double );
 
+  /** Set to dynamic update the ridge step size to be proportional to
+   * estimated tube radius during ridge traversal. */
+  void SetDynamicStepSize( bool dynamicStepSize );
+
+  /** Are step sizes made along a ridge fixed, or do they change based on
+   * local tube radius estimates. */
+  itkGetMacro( DynamicStepSize, bool );
+
   /** Set the Recovery Maximum */
-  itkSetMacro( RecoveryMax, int );
+  itkSetMacro( MaxRecoveryAttempts, int );
 
   /** Get the Recovery Maximum */
-  itkGetMacro( RecoveryMax, int );
+  itkGetMacro( MaxRecoveryAttempts, int );
 
   /** Delete a tube */
   template< class TDrawMask >
@@ -255,28 +269,74 @@ public:
   bool AddTube( const TubeType * tube, TDrawMask * drawMask );
   bool AddTube( const TubeType * tube );
 
-  /** Smooth a tube */
-  void SmoothTube( TubeType * tube, int h );
-
   /** Set the radius Extractor */
-  void  SetRadiusExtractor( RadiusExtractor<TInputImage> * radiusExtractor );
+  void  SetRadiusExtractor( RadiusExtractor2<TInputImage> * radiusExtractor );
 
   /** Compute the intensity at the point x */
   double  Intensity( const IndexType & x );
 
-  /** The ridgeness at point x */
+  /** Computes ridge measures at the given point x
+   *  and stores them so that they can be queried later.
+   *  Returns the ridgeness at x
+   *  \param x User supplied point at which ridge measures will be computed
+   *  \param intensity On return equals the interpolated intensity at x
+   *    Can be queried later using GetCurrentIntensity()
+   *  \param roundness On return equals the roundness at x
+   *    Can be queried later using GetCurrentRoundness()
+   *  \param curvature On return equals the curvature at x
+   *    Can be queried later using GetCurrentCurvature()
+   *  \param levelness On return equals the levelness at x
+   *    Can be queried later using GetCurrentLevelness()
+   */
   double  Ridgeness( const ContinuousIndexType & x,
     double & intensity,
     double & roundness,
     double & curvature,
-    double & linearity );
+    double & levelness,
+    const vnl_vector<double> & prevTangent=vnl_vector<double>());
 
-  /** Compute the local Ridge */
-  bool   LocalRidge( ContinuousIndexType & x );
+  /** Get current location
+   *  This is location at which the Ridgness function was last called
+   */
+  const VectorType & GetCurrentLocation() const;
+
+  /** Get the Hessian Eigen Basis at the current location
+   *  Each column of the return matrix is an eigen vector
+   *  in increasing order of the eigen values.
+   *  The third column is an approximation to the ridge tangent.
+   */
+  const MatrixType & GetCurrentBasis() const;
+
+  /** Get intensity at the current location */
+  double GetCurrentIntensity() const;
+
+  /** Get ridgness at the current location */
+  double GetCurrentRidgeness() const;
+
+  /** Get roundess at the current location */
+  double GetCurrentRoundness() const;
+
+  /** Get curvature at the current location */
+  double GetCurrentCurvature() const;
+
+  /** Get levelness at the current location */
+  double GetCurrentLevelness() const;
+
+  /** Compute/find the local Ridge */
+  FailureCodeEnum LocalRidge( ContinuousIndexType & x,
+    bool verbose=false );
 
   /** Extract */
-  typename TubeType::Pointer  ExtractRidge( const ContinuousIndexType & x,
-    int tubeID );
+  typename TubeType::Pointer ExtractRidge( const ContinuousIndexType & x,
+    int tubeID,
+    bool verbose=false );
+
+  itkGetMacro( CurrentFailureCode, FailureCodeEnum );
+
+  unsigned int      GetNumberOfFailureCodes( void ) const;
+  const std::string GetFailureCodeName( FailureCodeEnum code ) const;
+  unsigned int      GetFailureCodeCount( FailureCodeEnum code ) const;
+  void              ResetFailureCodeCounts( void );
 
   /** Set the idle callback */
   void   IdleCallBack( bool ( *idleCallBack )( void ) );
@@ -294,7 +354,7 @@ protected:
 
   /** Traverse the ridge one way */
   bool  TraverseOneWay( ContinuousIndexType & newX, VectorType & newT,
-    MatrixType & newN, int dir );
+    MatrixType & newN, int dir, bool verbose=false );
 
 private:
 
@@ -309,17 +369,18 @@ private:
 
   bool                                               m_DynamicScale;
   double                                             m_DynamicScaleUsed;
-  RadiusExtractor<TInputImage>                     * m_RadiusExtractor;
+  bool                                               m_DynamicStepSize;
+  RadiusExtractor2<TInputImage>                    * m_RadiusExtractor;
 
-  int                                                m_RecoveryMax;
+  int                                                m_MaxRecoveryAttempts;
 
   double                                             m_DataMin;
   double                                             m_DataMax;
   double                                             m_DataRange;
 
   double                                             m_StepX;
-  double                                             m_ThreshT;
-  double                                             m_ThreshX;
+  double                                             m_MaxTangentChange;
+  double                                             m_MaxXChange;
 
   IndexType                                          m_ExtractBoundMin;
   IndexType                                          m_ExtractBoundMax;
@@ -329,25 +390,49 @@ private:
   ::tube::SplineND                                 * m_DataSpline;
   ::tube::UserFunction< vnl_vector<int>, double >  * m_SplineValueFunc;
 
-  double                                             m_CurvatureExpectedMax;
+  FailureCodeEnum                                    m_CurrentFailureCode;
+  IntVectorType                                      m_FailureCodeCount;
 
-  double                                             m_ThreshRidgeness;
-  double                                             m_ThreshRidgenessStart;
-  double                                             m_ThreshRoundness;
-  double                                             m_ThreshRoundnessStart;
-  double                                             m_ThreshCurvature;
-  double                                             m_ThreshCurvatureStart;
-  double                                             m_ThreshLinearity;
-  double                                             m_ThreshLinearityStart;
+  double                                             m_MinRidgeness;
+  double                                             m_MinRidgenessStart;
+  double                                             m_MinRoundness;
+  double                                             m_MinRoundnessStart;
+  double                                             m_MinCurvature;
+  double                                             m_MinCurvatureStart;
+  double                                             m_MinLevelness;
+  double                                             m_MinLevelnessStart;
 
+  // current location
   VectorType                                         m_X;
+
   VectorType                                         m_XP;
+
+  // current intensity
   double                                             m_XVal;
 
+  // current gradient
   VectorType                                         m_XD;
+
+  // current Hessian
   MatrixType                                         m_XH;
+
+  // current Hessian Eigen Values
   VectorType                                         m_XHEVal;
+
+  // current Hessian Eigen Vectors
   MatrixType                                         m_XHEVect;
+
+  // current ridgeness
+  double                                             m_XRidgeness;
+
+  // current roundness
+  double                                             m_XRoundness;
+
+  // current curvature
+  double                                             m_XCurvature;
+
+  // current levelness
+  double                                             m_XLevelness;
 
   typename TubeType::Pointer                         m_Tube;
 

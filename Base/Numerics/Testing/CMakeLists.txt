@@ -30,6 +30,9 @@ set( MIDAS_KEY_DIR ${TubeTK_SOURCE_DIR}/MIDAS_Keys )
 find_package( SlicerExecutionModel REQUIRED )
 include( ${SlicerExecutionModel_USE_FILE} )
 
+find_package( ITK REQUIRED )
+include( ${ITK_USE_FILE} )
+
 find_package( PythonInterp )
 if( PYTHON_EXECUTABLE )
   add_test( PrintSelf-BaseNumerics ${PYTHON_EXECUTABLE}
@@ -56,7 +59,7 @@ set( tubeBaseNumerics_SRCS
   itktubeSingleValuedCostFunctionImageSourceTest.cxx
   itktubeRecordOptimizationParameterProgressionCommandTest.cxx
   itktubeRidgeBasisFeatureVectorGeneratorTest.cxx
-  itktubeRidgeFeatureVectorGeneratorTest.cxx
+  itktubeRidgeFFTFeatureVectorGeneratorTest.cxx
   itktubeVotingResampleImageFunctionTest.cxx
   tubeBrentOptimizer1DTest.cxx
   tubeBrentOptimizerNDTest.cxx
@@ -65,17 +68,26 @@ set( tubeBaseNumerics_SRCS
   tubeParabolicFitOptimizer1DTest.cxx
   tubeSplineApproximation1DTest.cxx
   tubeSplineNDTest.cxx
+  tubeTubeMathTest.cxx
   tubeUserFunctionTest.cxx )
-
-include_directories(
-  ${TubeTK_SOURCE_DIR}/Base/Common
-  ${TubeTK_SOURCE_DIR}/Base/Numerics )
 
 add_executable( tubeBaseNumericsHeaderTest
   tubeBaseNumericsHeaderTest.cxx )
 target_link_libraries( tubeBaseNumericsHeaderTest
-  TubeTKNumerics
-  ${ITK_LIBRARIES} )
+  TubeTKCommon TubeTKFiltering TubeTKNumerics ${ITK_LIBRARIES} )
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  target_link_libraries( tubeBaseNumericsHeaderTest ${ArrayFire_LIBRARIES} )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
+
+set( tubeBaseNumerics_External_Libraries )
+if( TubeTK_USE_GPU_ARRAYFIRE )
+  set( tubeBaseNumerics_External_Libraries ${ArrayFire_LIBRARIES} )
+endif( TubeTK_USE_GPU_ARRAYFIRE )
+
+set( no_install_option )
+if( NOT TubeTK_INSTALL_DEVELOPMENT )
+  set( no_install_option NO_INSTALL )
+endif()
 
 SEMMacroBuildCLI(
   NAME tubeBaseNumericsTests
@@ -83,15 +95,13 @@ SEMMacroBuildCLI(
     ${tubeBaseNumerics_SRCS}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
   TARGET_LIBRARIES
-    TubeTKNumerics
-    ${ITK_LIBRARIES}
-  INCLUDE_DIRECTORIES
-    ${TubeTK_SOURCE_DIR}/Base/Common
-    ${TubeTK_SOURCE_DIR}/Base/Numerics
-  INSTALL_RUNTIME_DESTINATION lib
-  INSTALL_LIBRARY_DESTINATION lib
-  INSTALL_ARCHIVE_DESTINATION bin
+    ${tubeBaseNumerics_External_Libraries}
+    TubeCLI TubeTKCommon TubeTKFiltering TubeTKNumerics ${ITK_LIBRARIES}
+    ITKIOMeta ITKIOHDF5 ITKOptimizers
+  EXECUTABLE_ONLY
+  ${no_install_option}
   )
+
 
 add_test( NAME tubeBaseNumericsHeaderTest
   COMMAND ${BASE_NUMERICS_HEADER_TEST} )
@@ -168,6 +178,7 @@ Midas3FunctionAddTest( NAME itktubeJointHistogramImageFunctionTest01
   COMMAND ${BASE_NUMERICS_TESTS}
     --compare MIDAS{itkJointHistogramImageFunctionTest01.mha.md5}
       ${TEMP}/itkJointHistogramImageFunctionTest01.mha
+    --compareNumberOfPixelsTolerance 7
     itktubeJointHistogramImageFunctionTest
       MIDAS{GDS0015_1_match_Subs.mha.md5}
       MIDAS{ES0015_1_Subs.mha.md5}
@@ -181,6 +192,7 @@ Midas3FunctionAddTest( NAME itktubeJointHistogramImageFunctionTest02
   COMMAND ${BASE_NUMERICS_TESTS}
     --compare MIDAS{itkJointHistogramImageFunctionTest02.mha.md5}
       ${TEMP}/itkJointHistogramImageFunctionTest02.mha
+    --compareNumberOfPixelsTolerance 7
     itktubeJointHistogramImageFunctionTest
       MIDAS{GDS0015_1_match_Subs.mha.md5}
       MIDAS{ES0015_1_Subs.mha.md5}
@@ -195,15 +207,16 @@ Midas3FunctionAddTest( NAME itktubeImageRegionMomentsCalculatorTest
     itktubeImageRegionMomentsCalculatorTest
       MIDAS{scoring-test.png.md5} )
 
-foreach( testNum RANGE 0 37 )
+foreach( testNum RANGE 0 38 )
   Midas3FunctionAddTest( NAME itktubeNJetImageFunctionTest${testNum}
     COMMAND ${BASE_NUMERICS_TESTS}
-      --compare MIDAS{itkTubeNJetImageFunctionTest${testNum}.mha.md5}
-        ${TEMP}/itkTubeNJetImageFunctionTest${testNum}.mha
+      --compare MIDAS{itktubeNJetImageFunctionTest${testNum}.mha.md5}
+        ${TEMP}/itktubeNJetImageFunctionTest${testNum}.mha
+        --compareIntensityTolerance 0.000000000001
       itktubeNJetImageFunctionTest
         ${testNum}
         MIDAS{im0001.crop2.mha.md5}
-        ${TEMP}/itkTubeNJetImageFunctionTest${testNum}.mha )
+        ${TEMP}/itktubeNJetImageFunctionTest${testNum}.mha )
 endforeach( testNum )
 
 Midas3FunctionAddTest( NAME itktubeVotingResampleImageFunctionTest0
@@ -254,31 +267,31 @@ add_test( NAME itktubeRecordOptimizationParameterProgressionCommandTest
 
 Midas3FunctionAddTest( NAME itktubeBlurImageFunctionTest
   COMMAND ${BASE_NUMERICS_TESTS}
-    --compare MIDAS{itkTubeBlurImageFunctionTest.mha.md5}
-      ${TEMP}/itkTubeBlurImageFunctionTest.mha
+    --compare MIDAS{itktubeBlurImageFunctionTest.mha.md5}
+      ${TEMP}/itktubeBlurImageFunctionTest.mha
     itktubeBlurImageFunctionTest
-      ${TEMP}/itkTubeBlurImageFunctionTest.mha )
+      ${TEMP}/itktubeBlurImageFunctionTest.mha )
 
 Midas3FunctionAddTest( NAME itktubeNJetFeatureVectorGeneratorTest
   COMMAND ${BASE_NUMERICS_TESTS}
-    --compare MIDAS{itkTubeNJetFeatureVectorGeneratorTest_f0.mha.md5}
-      ${TEMP}/itkTubeNJetFeatureVectorGeneratorTest_f0.mha
+    --compare MIDAS{itktubeNJetFeatureVectorGeneratorTest_f0.mha.md5}
+      ${TEMP}/itktubeNJetFeatureVectorGeneratorTest_f0.mha
     itktubeNJetFeatureVectorGeneratorTest
       MIDAS{ES0015_Large_Subs.mha.md5}
       MIDAS{GDS0015_Large-TrainingMask_Subs.mha.md5}
-      ${TEMP}/itkTubeNJetFeatureVectorGeneratorTest_f0.mha
-      ${TEMP}/itkTubeNJetFeatureVectorGeneratorTest_f1.mha )
+      ${TEMP}/itktubeNJetFeatureVectorGeneratorTest_f0.mha
+      ${TEMP}/itktubeNJetFeatureVectorGeneratorTest_f1.mha )
 
 Midas3FunctionAddTest( NAME itktubeNJetBasisFeatureVectorGeneratorTest
   COMMAND ${BASE_NUMERICS_TESTS}
-    --compare MIDAS{itkTubeNJetBasisFeatureVectorGeneratorTest_lda0.mha.md5}
-      ${TEMP}/itkTubeNJetBasisFeatureVectorGeneratorTest_lda0.mha
+    --compare MIDAS{itktubeNJetBasisFeatureVectorGeneratorTest_basis.0.mha.md5}
+      ${TEMP}/itktubeNJetBasisFeatureVectorGeneratorTest_basis.0.mha
     itktubeNJetBasisFeatureVectorGeneratorTest
       MIDAS{ES0015_Large_Subs.mha.md5}
       MIDAS{GDS0015_Large-TrainingMask_Subs.mha.md5}
       255 0
-      ${TEMP}/itkTubeNJetBasisFeatureVectorGeneratorTest_lda0.mha
-      ${TEMP}/itkTubeNJetBasisFeatureVectorGeneratorTest_lda1.mha )
+      ${TEMP}/itktubeNJetBasisFeatureVectorGeneratorTest_basis
+      ${TEMP}/itktubeNJetBasisFeatureVectorGeneratorTest_feature )
 
 Midas3FunctionAddTest( NAME itktubeSingleValuedCostFunctionImageSourceTest
   COMMAND ${BASE_NUMERICS_TESTS}
@@ -287,12 +300,12 @@ Midas3FunctionAddTest( NAME itktubeSingleValuedCostFunctionImageSourceTest
     itktubeSingleValuedCostFunctionImageSourceTest
       ${TEMP}/itktubeSingleValuedCostFunctionImageSourceTest.mha )
 
-Midas3FunctionAddTest( NAME itktubeRidgeFeatureVectorGeneratorTest
+Midas3FunctionAddTest( NAME itktubeRidgeFFTFeatureVectorGeneratorTest
   COMMAND ${BASE_NUMERICS_TESTS}
-    itktubeRidgeFeatureVectorGeneratorTest
+    itktubeRidgeFFTFeatureVectorGeneratorTest
       MIDAS{im0001.crop.contrast.mha.md5}
-      ${TEMP}/itkTubeRidgeFeatureVectorGeneratorTest_f0.mha
-      ${TEMP}/itkTubeRidgeFeatureVectorGeneratorTest_f1.mha )
+      ${TEMP}/itktubeRidgeFFTFeatureVectorGeneratorTest_f0.mha
+      ${TEMP}/itktubeRidgeFFTFeatureVectorGeneratorTest_f1.mha )
 
 Midas3FunctionAddTest( NAME itktubeRidgeBasisFeatureVectorGeneratorTest
   COMMAND ${BASE_NUMERICS_TESTS}
@@ -300,5 +313,9 @@ Midas3FunctionAddTest( NAME itktubeRidgeBasisFeatureVectorGeneratorTest
       MIDAS{im0001.crop.contrast.mha.md5}
       MIDAS{im0001.vk.mask.crop.mha.md5}
       255 127
-      ${TEMP}/itkTubeRidgeBasisFeatureVectorGeneratorTest_lda0.mha
-      ${TEMP}/itkTubeRidgeBasisFeatureVectorGeneratorTest_lda1.mha )
+      ${TEMP}/itktubeRidgeBasisFeatureVectorGeneratorTest_lda0.mha
+      ${TEMP}/itktubeRidgeBasisFeatureVectorGeneratorTest_lda1.mha )
+
+add_test( NAME tubeTubeMathTest
+  COMMAND ${BASE_NUMERICS_TESTS}
+  tubeTubeMathTest )

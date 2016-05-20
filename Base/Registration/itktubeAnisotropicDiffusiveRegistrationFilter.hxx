@@ -29,7 +29,7 @@ limitations under the License.
 #include "itktubeDiffusiveRegistrationFilterUtils.h"
 
 #include <itkImageRegionSplitter.h>
-#include <itkSmoothingRecursiveGaussianImageFilter.h>
+#include <itktubeSmoothingRecursiveGaussianImageFilter.h>
 
 #include <vtkFloatArray.h>
 #include <vtkPointData.h>
@@ -137,7 +137,7 @@ AnisotropicDiffusiveRegistrationFilter
   TensorDerivativeImagePointer secondOrder;
   for( int i = 0; i < this->GetNumberOfTerms(); i++ )
     {
-    for( int j = 0; j < ImageDimension; j++ )
+    for( unsigned int j = 0; j < ImageDimension; j++ )
       {
       firstOrder = ScalarDerivativeImageType::New();
       DiffusiveRegistrationFilterUtils::AllocateSpaceForImage( firstOrder, output );
@@ -465,9 +465,9 @@ AnisotropicDiffusiveRegistrationFilter
       distance = 0.0;
       for( unsigned int i = 0; i < ImageDimension; i++ )
         {
-        distance += vcl_pow( imageCoord[i] - borderCoord[i], 2 );
+        distance += std::pow( imageCoord[i] - borderCoord[i], 2 );
         }
-      distance = vcl_sqrt( distance );
+      distance = std::sqrt( distance );
       // The weight image will temporarily store distances
       weightIt.Set( distance );
       }
@@ -517,7 +517,7 @@ AnisotropicDiffusiveRegistrationFilter
   if( computeWeights )
     {
     double weightSmoothingSigma = 1.0;
-    typedef itk::SmoothingRecursiveGaussianImageFilter
+    typedef itk::tube::SmoothingRecursiveGaussianImageFilter
         < WeightImageType, WeightImageType > WeightSmoothingFilterType;
     typename WeightSmoothingFilterType::Pointer weightSmooth
         = WeightSmoothingFilterType::New();
@@ -565,7 +565,7 @@ AnisotropicDiffusiveRegistrationFilter
   < TFixedImage, TMovingImage, TDeformationField >
 ::ComputeWeightFromDistanceExponential( const WeightType distance ) const
 {
-  return vcl_exp( -1.0 * m_Lambda * distance );
+  return std::exp( -1.0 * m_Lambda * distance );
 }
 
 /**
@@ -582,7 +582,7 @@ AnisotropicDiffusiveRegistrationFilter
 ::ComputeWeightFromDistanceDirac( const WeightType distance ) const
 {
   return 1.0 - ( 1.0 / ( 1.0 + m_Lambda * m_Gamma
-                         * vcl_exp( -1.0 * m_Lambda * distance * distance ) ) );
+                         * std::exp( -1.0 * m_Lambda * distance * distance ) ) );
 }
 
 /**
@@ -712,7 +712,7 @@ AnisotropicDiffusiveRegistrationFilter
 
   NormalVectorType normalVector;
   normalVector.Fill( 0.0 );
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     // Create the multiplication vector image
     DeformationFieldPointer normalMultsImage = DeformationFieldType::New();

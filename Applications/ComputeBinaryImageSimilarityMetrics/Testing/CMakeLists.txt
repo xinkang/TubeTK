@@ -32,20 +32,20 @@ set( TEMP ${TubeTK_BINARY_DIR}/Temporary )
 set( PROJ_EXE
  ${TubeTK_LAUNCHER} $<TARGET_FILE:${MODULE_NAME}> )
 
-set( TEXTCOMPARE_EXE
- ${TubeTK_LAUNCHER} $<TARGET_FILE:TextCompareCommand> )
+set( CompareTextFiles_EXE
+ ${TubeTK_LAUNCHER} $<TARGET_FILE:CompareTextFiles> )
 
 # Test1
 Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test1
-            COMMAND ${PROJ_EXE}
-               -o ${TEMP}/${MODULE_NAME}Test1.txt
-               MIDAS{GDS0015_Large_Modified.mha.md5}
-               MIDAS{GDS0015_Large.mha.md5} )
+  COMMAND ${PROJ_EXE}
+    -o ${TEMP}/${MODULE_NAME}Test1.txt
+    MIDAS{GDS0015_Large_Modified.mha.md5}
+    MIDAS{GDS0015_Large.mha.md5} )
 
 # Test1-Compare
 Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test1-Compare
-            COMMAND ${TEXTCOMPARE_EXE}
-               -t ${TEMP}/${MODULE_NAME}Test1.txt
-               -b MIDAS{${MODULE_NAME}Test1.txt.md5} )
+  COMMAND ${CompareTextFiles_EXE}
+    -t ${TEMP}/${MODULE_NAME}Test1.txt
+    -b MIDAS{${MODULE_NAME}Test1.txt.md5} )
 set_property( TEST ${MODULE_NAME}-Test1-Compare
-                      APPEND PROPERTY DEPENDS ${MODULE_NAME}-Test1 )
+  APPEND PROPERTY DEPENDS ${MODULE_NAME}-Test1 )

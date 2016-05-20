@@ -33,21 +33,23 @@ find_package( SlicerExecutionModel REQUIRED )
 include( ${SlicerExecutionModel_USE_FILE} )
 
 find_package( ITK REQUIRED )
+if( TubeTK_BUILD_WITHIN_SLICER )
+  set( ITK_NO_IO_FACTORY_REGISTER_MANAGER 1 )
+endif( TubeTK_BUILD_WITHIN_SLICER )
 include( ${ITK_USE_FILE} )
 
 if( CMAKE_COMPILER_IS_GNUCXX )
-  set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ffast-math -msse3" )
+  tubetk_append_if_absent(CMAKE_FLAGS_RELEASE "-03")
+  tubetk_append_if_absent(CMAKE_FLAGS_RELEASE "-ffast-math")
+  tubetk_append_if_absent(CMAKE_FLAGS_RELEASE "-msse3")
 endif( CMAKE_COMPILER_IS_GNUCXX )
 
 SEMMacroBuildCLI(
   NAME ${MODULE_NAME}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
-  TARGET_LIBRARIES ${ITK_LIBRARIES}
-  INCLUDE_DIRECTORIES
-    ${TubeTK_SOURCE_DIR}/Base/CLI
-    ${TubeTK_SOURCE_DIR}/Base/Common
-    ${TubeTK_SOURCE_DIR}/Base/Filtering
-    ${TubeTK_SOURCE_DIR}/Base/ObjectDocuments )
+  TARGET_LIBRARIES
+    ${ITK_LIBRARIES}
+    TubeCLI TubeTKCommon )
 
 if( BUILD_TESTING )
   add_subdirectory( Testing )

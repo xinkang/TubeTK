@@ -50,32 +50,40 @@ namespace tube
  *  The resulting tube could be cropped and/or a narrow band could be
  *  defined.
  */
-template< class TTransformType, unsigned int VDimension >
-class TubeToTubeTransformFilter
-  : public SpatialObjectToSpatialObjectFilter< GroupSpatialObject< VDimension >,
-                                               GroupSpatialObject< VDimension > >
+template< class TTransformType, unsigned int TDimension >
+class TubeToTubeTransformFilter :
+  public SpatialObjectToSpatialObjectFilter<
+  GroupSpatialObject< TDimension >,
+  GroupSpatialObject< TDimension > >
 {
 public:
 
-  typedef GroupSpatialObject<VDimension>                       GroupType;
+  typedef GroupSpatialObject< TDimension >                   GroupType;
 
   /** Standard class typedefs. */
-  typedef TubeToTubeTransformFilter<TTransformType,VDimension> Self;
-  typedef SpatialObjectToSpatialObjectFilter<GroupType, GroupType>
-                                                               Superclass;
-  typedef SmartPointer< Self >                                 Pointer;
-  typedef SmartPointer< const Self >                           ConstPointer;
+  typedef TubeToTubeTransformFilter< TTransformType, TDimension >
+    Self;
 
-  typedef VesselTubeSpatialObject<VDimension>     TubeType;
+  typedef SpatialObjectToSpatialObjectFilter< GroupType, GroupType >
+    Superclass;
+
+  typedef SmartPointer< Self >                               Pointer;
+  typedef SmartPointer< const Self >                         ConstPointer;
+
+  typedef VesselTubeSpatialObject< TDimension >              TubeType;
+
+  typedef typename VesselTubeSpatialObject< TDimension >::TransformType
+    TubeTransformType;
 
   /** Typedef for the transformations */
-  typedef TTransformType                          TransformType;
+  typedef TTransformType                                     TransformType;
 
   /** Method for creation through the object factory. */
   itkNewMacro( Self );
 
   /** Run-time type information (and related methods). */
-  itkTypeMacro( TubeToTubeTransformFilter, SpatialObjectToSpatialObjectFilter );
+  itkTypeMacro( TubeToTubeTransformFilter,
+    SpatialObjectToSpatialObjectFilter );
 
   /** Apply the transformation to the tube */
   void Update( void );
@@ -83,38 +91,11 @@ public:
   /** Set the Transformation */
   itkSetObjectMacro( Transform, TransformType );
 
-  /** Set the transform as a group spatial object */
-  void SetTransform(const GroupType * transform)
-    {
-    m_TransformAsGroup = transform;
-    }
+  /** Set the Object to Index transform for the output tubes */
+  itkSetObjectMacro( OutputIndexToObjectTransform, TubeTransformType );
 
   /** Get the output tubenet */
   itkGetObjectMacro( Output, GroupType );
-
-  /** Set the narrow band size */
-  itkSetMacro( NarrowBandSize, double );
-
-  /** Set the scale */
-  itkSetMacro( Scale, double );
-
-  /**
-   * Set the Ridgeness of all the tubes in the tubenet
-   * if Ridgeness is not set then the tube keeps its own value
-   */
-  itkSetMacro( Ridgeness, double );
-
-  /**
-   * Set the Medialness of all the tubes in the tubenet
-   * if Medialness is not set then the tube keeps its own value
-   */
-  itkSetMacro( Medialness, double );
-
-  /** Set if we should crop the tube net to fit the image */
-  itkSetMacro( Crop, bool );
-
-  /** Set the size of the Region of Interest */
-  void SetCropSize(double* cropSize) {m_CropSize = cropSize;}
 
 protected:
 
@@ -127,16 +108,14 @@ private:
   TubeToTubeTransformFilter(const Self&); //purposely not implemented
   void operator=(const Self&);            //purposely not implemented
 
-  typename GroupType::ConstPointer      m_TransformAsGroup;
-  typename TransformType::Pointer       m_Transform;
-  typename GroupType::Pointer           m_Output;
+  void UpdateLevel( SpatialObject< TDimension > * inputSO,
+    SpatialObject< TDimension > * parentSO );
 
-  double                 m_Scale;
-  bool                   m_Crop;
-  double                 m_NarrowBandSize;
-  double*                m_CropSize;
-  double                 m_Ridgeness; // default -1
-  double                 m_Medialness; // default -1
+  typename TransformType::Pointer            m_Transform;
+
+  typename TubeTransformType::Pointer        m_OutputIndexToObjectTransform;
+
+  typename GroupType::Pointer                m_Output;
 
 }; // End class TubeToTubeTransformFilter
 

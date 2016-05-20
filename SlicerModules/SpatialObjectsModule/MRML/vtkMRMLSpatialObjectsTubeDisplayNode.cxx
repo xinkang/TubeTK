@@ -63,7 +63,8 @@ vtkMRMLSpatialObjectsTubeDisplayNode::vtkMRMLSpatialObjectsTubeDisplayNode( void
 
   // Pipeline
   this->amontAssignAttribute = vtkAssignAttribute::New();
-  this->amontAssignAttribute->Assign("TubeRadius",
+  this->SetActiveScalarName("TubeRadius");
+  this->amontAssignAttribute->Assign(this->GetActiveScalarName(),
                                      vtkDataSetAttributes::SCALARS,
                                      vtkAssignAttribute::POINT_DATA);
   this->TubeFilter->SetInputConnection(
@@ -150,11 +151,20 @@ PrintSelf(ostream& os, vtkIndent indent)
   os << indent << "TubeRadius: " << this->TubeRadius << "\n";
 }
 
+#if (VTK_MAJOR_VERSION < 6)
 //------------------------------------------------------------------------------
 void vtkMRMLSpatialObjectsTubeDisplayNode::SetInputToPolyDataPipeline(vtkPolyData* polyData)
 {
   this->amontAssignAttribute->SetInput(polyData);
 }
+#else
+//------------------------------------------------------------------------------
+void vtkMRMLSpatialObjectsTubeDisplayNode
+::SetInputToPolyDataPipeline(vtkAlgorithmOutput* polyDataConnection)
+{
+  this->amontAssignAttribute->SetInputConnection(polyDataConnection);
+}
+#endif
 
 //------------------------------------------------------------------------------
 vtkPolyData* vtkMRMLSpatialObjectsTubeDisplayNode::GetInputPolyData( void )

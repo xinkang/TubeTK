@@ -32,22 +32,39 @@ set( TEMP ${TubeTK_BINARY_DIR}/Temporary )
 set( PROJ_EXE
  ${TubeTK_LAUNCHER} $<TARGET_FILE:${MODULE_NAME}> )
 
-set( IMAGECOMPARE_EXE
- ${TubeTK_LAUNCHER} $<TARGET_FILE:ImageCompareCommand> )
+set( CompareImages_EXE
+ ${TubeTK_LAUNCHER} $<TARGET_FILE:CompareImages> )
 
 # Test1
 Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test1
                 COMMAND ${PROJ_EXE}
+                  MIDAS{Branch.n010.mha.md5}
                   MIDAS{Branch-truth.tre.md5}
-                  --inputTemplateImage MIDAS{Branch.n010.mha.md5}
                   ${TEMP}/${MODULE_NAME}Test1.mha )
 
 # Test1-Compare
 Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test1-Compare
-                COMMAND ${IMAGECOMPARE_EXE}
+                COMMAND ${CompareImages_EXE}
                   -t ${TEMP}/${MODULE_NAME}Test1.mha
                   -b MIDAS{${MODULE_NAME}Test1.mha.md5}
                   -i 0.0001 )
-
 set_property( TEST ${MODULE_NAME}-Test1-Compare
            APPEND PROPERTY DEPENDS ${MODULE_NAME}-Test1 )
+
+# Test2
+Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test2
+                COMMAND ${PROJ_EXE}
+                  -r
+                  MIDAS{Branch.n010.mha.md5}
+                  MIDAS{Branch-truth.tre.md5}
+                  ${TEMP}/${MODULE_NAME}Test2.mha )
+
+# Test2-Compare
+Midas3FunctionAddTest( NAME ${MODULE_NAME}-Test2-Compare
+                COMMAND ${CompareImages_EXE}
+                  -t ${TEMP}/${MODULE_NAME}Test2.mha
+                  -b MIDAS{${MODULE_NAME}Test2.mha.md5}
+                  -i 0.0001 )
+set_property( TEST ${MODULE_NAME}-Test2-Compare
+           APPEND PROPERTY DEPENDS ${MODULE_NAME}-Test2 )
+

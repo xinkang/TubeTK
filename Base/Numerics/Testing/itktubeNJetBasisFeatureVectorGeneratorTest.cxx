@@ -88,12 +88,14 @@ int itktubeNJetBasisFeatureVectorGeneratorTest( int argc, char * argv[] )
     }
   LabelMapType::Pointer maskImage = maskReader->GetOutput();
 
-  FilterType::NJetScalesType scales( 2 );
-  scales[0] = 4;
-  scales[1] = 8;
+  FilterType::NJetScalesType scales;
+  scales.clear();
+  scales.push_back( 4 );
+  scales.push_back( 8 );
 
-  FilterType::NJetScalesType scales2( 1 );
-  scales2[0] = 8;
+  FilterType::NJetScalesType scales2;
+  scales2.clear();
+  scales2.push_back( 8 );
 
   FilterType::Pointer filter = FilterType::New();
   filter->SetInput( inputImage );
@@ -101,50 +103,78 @@ int itktubeNJetBasisFeatureVectorGeneratorTest( int argc, char * argv[] )
   filter->SetFirstScales( scales );
   filter->SetSecondScales( scales2 );
   filter->SetRidgeScales( scales2 );
-
-  std::cout << filter << std::endl;
+  filter->SetUpdateWhitenStatisticsOnUpdate( true );
+  filter->Update();
+  filter->SetUpdateWhitenStatisticsOnUpdate( false );
 
   BasisFilterType::Pointer basisFilter = BasisFilterType::New();
-  basisFilter->SetInputFeatureVectorGenerator( filter.GetPointer() );
+  basisFilter->SetInputFeatureVectorGenerator( filter );
   basisFilter->SetInput( inputImage );
   basisFilter->SetLabelMap( maskImage );
   int objId = std::atoi( argv[3] );
   int bkgId = std::atoi( argv[4] );
   basisFilter->SetObjectId( objId );
   basisFilter->AddObjectId( bkgId );
-  basisFilter->GenerateBasis();
-
-  std::cout << basisFilter << std::endl;
+  basisFilter->SetNumberOfLDABasisToUseAsFeatures( 1 );
+  basisFilter->SetNumberOfPCABasisToUseAsFeatures( 3 );
+  basisFilter->SetUpdateWhitenStatisticsOnUpdate( true );
+  basisFilter->Update();
+  basisFilter->SetUpdateWhitenStatisticsOnUpdate( false );
 
   basisFilter->SetLabelMap( NULL );
 
-  WriterType::Pointer featureImage0Writer = WriterType::New();
-  featureImage0Writer->SetFileName( argv[5] );
-  featureImage0Writer->SetUseCompression( true );
-  featureImage0Writer->SetInput( basisFilter->GetFeatureImage( 0 ) );
-  try
+  for( unsigned int i=0; i<basisFilter->GetNumberOfFeatures(); ++i )
     {
-    featureImage0Writer->Update();
-    }
-  catch (itk::ExceptionObject& e)
-    {
-    std::cerr << "Exception caught during write:" << std::endl << e;
-    return EXIT_FAILURE;
+    WriterType::Pointer featureImage0Writer = WriterType::New();
+    char fname[255];
+    sprintf( fname, "%s.%d.mha", argv[5], i );
+    std::cout << "Saving basis feature image: " << fname << std::endl;
+    featureImage0Writer->SetFileName( fname );
+    featureImage0Writer->SetUseCompression( true );
+    featureImage0Writer->SetInput( basisFilter->GetFeatureImage( i ) );
+    try
+      {
+      featureImage0Writer->Update();
+      }
+    catch (itk::ExceptionObject& e)
+      {
+      std::cerr << "Exception caught during write:" << std::endl << e;
+      return EXIT_FAILURE;
+      }
+    catch ( ... )
+      {
+      std::cerr << "Unhandled exception caught during basis write:"
+        << fname << std::endl;
+      return EXIT_FAILURE;
+      }
     }
 
-  WriterType::Pointer featureImage1Writer = WriterType::New();
-  featureImage1Writer->SetFileName( argv[6] );
-  featureImage1Writer->SetUseCompression( true );
-  featureImage1Writer->SetInput( basisFilter->GetFeatureImage( 1 ) );
-  try
+  for( unsigned int i=0; i<filter->GetNumberOfFeatures(); ++i )
     {
-    featureImage1Writer->Update();
+    WriterType::Pointer featureImage1Writer = WriterType::New();
+    char fname[255];
+    sprintf( fname, "%s.%d.mha", argv[6], i );
+    std::cout << "Saving feature image: " << fname << std::endl;
+    featureImage1Writer->SetFileName( fname );
+    featureImage1Writer->SetUseCompression( true );
+    try
+      {
+      featureImage1Writer->SetInput( filter->GetFeatureImage( i ) );
+      featureImage1Writer->Update();
+      }
+    catch (itk::ExceptionObject& e)
+      {
+      std::cerr << "Exception caught during write:" << std::endl << e;
+      return EXIT_FAILURE;
+      }
+    catch( ... )
+      {
+      std::cerr << "Unhandled exception caught during write:"
+        << fname << std::endl;
+      return EXIT_FAILURE;
+      }
     }
-  catch (itk::ExceptionObject& e)
-    {
-    std::cerr << "Exception caught during write:" << std::endl << e;
-    return EXIT_FAILURE;
-    }
+  std::cout << "DONE." << std::endl;
 
   return EXIT_SUCCESS;
 }

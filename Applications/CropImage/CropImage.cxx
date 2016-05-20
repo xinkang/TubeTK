@@ -21,10 +21,20 @@ limitations under the License.
 
 =========================================================================*/
 
-#include "tubeCropROI.h"
+// TubeTK includes
+#include "tubeMessage.h"
+#include "tubeCLIProgressReporter.h"
 
+// TubeTKITK includes
+#include "tubeCropImage.h"
+
+// ITK includes
 #include <itkImageFileReader.h>
 #include <itkImageFileWriter.h>
+#include <itkImageRegionConstIterator.h>
+#include <itkTimeProbesCollectorBase.h>
+
+using tube::CLIProgressReporter;
 
 #include "CropImageCLP.h"
 
@@ -72,7 +82,7 @@ int DoIt( int argc, char * argv[] )
   progressReporter.Report( 0.1 );
 
   if( size.size() > 0 || max.size() > 0 || min.size() > 0 ||
-    matchVolume.size() > 0)
+    matchVolume.size() > 0 || matchMask.size() > 0 )
     {
     if( size.size() > 0 && max.size() > 0 )
       {
@@ -90,53 +100,31 @@ int DoIt( int argc, char * argv[] )
 
     timeCollector.Start( "CropFilter" );
 
-    tube::CropROI< TPixel, VDimension > cropFilter;
+    typedef tube::CropImage< ImageType, ImageType > CropFilterType;
+    typename CropFilterType::Pointer cropFilter = CropFilterType::New();
 
-    cropFilter.SetInput( reader->GetOutput() );
+    cropFilter->SetInput( reader->GetOutput() );
+
     if( matchVolume.size() > 0 )
       {
-      typename ImageType::Pointer image = reader->GetOutput();
-
       typename ReaderType::Pointer matchReader = ReaderType::New();
       matchReader->SetFileName( matchVolume.c_str() );
       matchReader->UpdateOutputInformation();
-      typename ImageType::ConstPointer match =
-        matchReader->GetOutput();
 
-      const typename ImageType::RegionType matchRegion =
-        match->GetLargestPossibleRegion();
-      const typename ImageType::IndexType matchIndex =
-        matchRegion.GetIndex();
-      const typename ImageType::SizeType matchSize =
-        matchRegion.GetSize();
-      const typename ImageType::PointType matchOrigin =
-        match->GetOrigin();
-      const typename ImageType::SpacingType matchSpacing =
-        match->GetSpacing();
+      cropFilter->SetMatchVolume( matchReader->GetOutput() );
+      }
 
-      const typename ImageType::RegionType imgRegion =
-        image->GetLargestPossibleRegion();
-      const typename ImageType::IndexType imgIndex =
-        imgRegion.GetIndex();
-      const typename ImageType::PointType imgOrigin =
-        image->GetOrigin();
-      const typename ImageType::SpacingType imgSpacing =
-        image->GetSpacing();
+    if( matchMask.size() > 0 )
+      {
+      timeCollector.Start( "Mask Bounding Box" );
 
-      typename ImageType::IndexType minI;
-      typename ImageType::SizeType sizeI;
+      typename ReaderType::Pointer maskReader = ReaderType::New();
+      maskReader->SetFileName( matchMask.c_str() );
+      maskReader->Update();
 
-      for( unsigned int i = 0; i < VDimension; i++ )
-        {
-        minI[i] = vnl_math_rnd( ( ( matchOrigin[i]
-          + matchIndex[i] * matchSpacing[i] ) - ( imgOrigin[i]
-          + imgIndex[i] * imgSpacing[i] ) )
-          / imgSpacing[i] );
-        sizeI[i] = vnl_math_rnd( ( matchSize[i] * matchSpacing[i] )
-          / imgSpacing[i] );
-        }
-      cropFilter.SetMin( minI );
-      cropFilter.SetSize( sizeI );
+      cropFilter->SetMatchMask( maskReader->GetOutput() );
+
+      timeCollector.Stop( "Mask Bounding Box" );
       }
 
     if( min.size() > 0 )
@@ -146,7 +134,7 @@ int DoIt( int argc, char * argv[] )
         {
         minI[i] = min[i];
         }
-      cropFilter.SetMin( minI );
+      cropFilter->SetMin( minI );
       }
 
     if( max.size() > 0 )
@@ -156,7 +144,7 @@ int DoIt( int argc, char * argv[] )
         {
         maxI[i] = max[i];
         }
-      cropFilter.SetMax( maxI );
+      cropFilter->SetMax( maxI );
       }
 
     if( size.size() > 0 )
@@ -166,7 +154,7 @@ int DoIt( int argc, char * argv[] )
         {
         sizeI[i] = size[i];
         }
-      cropFilter.SetSize( sizeI );
+      cropFilter->SetSize( sizeI );
       }
 
     if( center.size() > 0 )
@@ -176,7 +164,7 @@ int DoIt( int argc, char * argv[] )
         {
         centerI[i] = center[i];
         }
-      cropFilter.SetCenter( centerI );
+      cropFilter->SetCenter( centerI );
       }
 
     if( boundary.size() > 0 )
@@ -186,15 +174,14 @@ int DoIt( int argc, char * argv[] )
         {
         boundaryI[i] = boundary[i];
         }
-      cropFilter.SetBoundary( boundaryI );
+      cropFilter->SetBoundary( boundaryI );
       }
 
-    cropFilter.SetTimeCollector( &timeCollector );
-    cropFilter.SetProgressReporter( &progressReporter, 0.1, 0.8 );
+    progressReporter.Report( 0.6 );
 
     try
       {
-      cropFilter.Update();
+      cropFilter->Update();
       }
     catch( itk::ExceptionObject & e )
       {
@@ -217,14 +204,16 @@ int DoIt( int argc, char * argv[] )
       timeCollector.Stop( "CropFilter" );
       return EXIT_FAILURE;
       }
+
     timeCollector.Stop( "CropFilter" );
+    progressReporter.Report( 0.8 );
+    timeCollector.Start( "Save data" );
 
     typedef itk::ImageFileWriter< ImageType  >   ImageWriterType;
 
-    timeCollector.Start( "Save data" );
     typename ImageWriterType::Pointer writer = ImageWriterType::New();
     writer->SetFileName( outputVolume.c_str() );
-    writer->SetInput( cropFilter.GetOutput() );
+    writer->SetInput( cropFilter->GetOutput() );
     writer->SetUseCompression( true );
     try
       {
@@ -240,61 +229,46 @@ int DoIt( int argc, char * argv[] )
     }
   else if( split.size() == VDimension )
     {
-    tube::CropROI< TPixel, VDimension > cropFilter;
-
-    typename ImageType::Pointer inputImage = reader->GetOutput();
-    typename ImageType::SizeType inputImageSize = inputImage->
-                                          GetLargestPossibleRegion().
-                                          GetSize();
-
-    cropFilter.SetInput( inputImage );
-
-    if( boundary.size() > 0 )
-      {
-      typename ImageType::IndexType boundaryI;
-      for( unsigned int i = 0; i < VDimension; i++ )
-        {
-        boundaryI[i] = boundary[i];
-        }
-      cropFilter.SetBoundary( boundaryI );
-      }
-
-    cropFilter.SetTimeCollector( &timeCollector );
-    cropFilter.SetProgressReporter( &progressReporter, 0.1, 0.8 );
-
-    typename ImageType::IndexType roiStep;
-    typename ImageType::IndexType roiSize;
+    typename ImageType::IndexType splitI;
     for( unsigned int i = 0; i < VDimension; i++ )
       {
-      roiStep[i] = inputImageSize[i] / ( split[i] + 1 );
-      roiSize[i] = inputImageSize[i] / split[i];
+      splitI[i] = split[i];
       }
+
+    typename ImageType::Pointer inputImage = reader->GetOutput();
+
     typename ImageType::IndexType roiIndex;
     roiIndex.Fill( 0 );
-    typename ImageType::IndexType roiMin;
-    roiMin.Fill( 0 );
-    typename ImageType::IndexType roiMax;
-    roiMax.Fill( 0 );
+
     bool done = false;
+    // Update filter until we get all split part of the inputImage
     while( !done )
       {
-      timeCollector.Start( "CropFilter" );
+      //Create new instance of cropFilter each time we extract a portion of
+      // the image to reset parameters
+      typedef tube::CropImage<ImageType, ImageType> CropFilterType;
+      typename CropFilterType::Pointer cropFilter = CropFilterType::New();
+      cropFilter->SetInput( inputImage );
 
-      for( unsigned int i = 0; i < VDimension; i++ )
+      if( boundary.size() > 0 )
         {
-        roiMin[i] = roiIndex[i] * roiSize[i];
-        roiMax[i] = roiMin[i] + roiSize[i] - 1;
-        if( roiIndex[i] == split[i]-1 )
+        typename ImageType::IndexType boundaryI;
+        for( unsigned int i = 0; i < VDimension; i++ )
           {
-          roiMax[i] = inputImageSize[i]-1;
+          boundaryI[i] = boundary[i];
           }
+        cropFilter->SetBoundary( boundaryI );
         }
 
-      cropFilter.SetMin( roiMin );
-      cropFilter.SetMax( roiMax );
+      progressReporter.Report( 0.6 );
+
+      timeCollector.Start( "CropFilter" );
+
+      cropFilter->SetSplitInput( splitI, roiIndex );
+
       try
         {
-        cropFilter.Update();
+        cropFilter->Update();
         }
       catch( itk::ExceptionObject & e )
         {
@@ -321,8 +295,9 @@ int DoIt( int argc, char * argv[] )
         }
 
       timeCollector.Stop( "CropFilter" );
-
+      progressReporter.Report( 0.8 );
       timeCollector.Start( "Save data" );
+
       typedef itk::ImageFileWriter< ImageType  >   ImageWriterType;
       typename ImageWriterType::Pointer writer = ImageWriterType::New();
 
@@ -336,7 +311,7 @@ int DoIt( int argc, char * argv[] )
       out << ".mha";
       writer->SetFileName( out.str() );
 
-      writer->SetInput( cropFilter.GetOutput() );
+      writer->SetInput( cropFilter->GetOutput() );
       writer->SetUseCompression( true );
       try
         {
@@ -350,6 +325,7 @@ int DoIt( int argc, char * argv[] )
         }
       timeCollector.Stop( "Save data" );
 
+      //Update ROIIndex value to get the next split image
       unsigned int i=0;
       while( !done && ++roiIndex[i] >= split[i] )
         {

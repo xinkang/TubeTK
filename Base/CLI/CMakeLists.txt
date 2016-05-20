@@ -32,13 +32,18 @@ set( TubeTK_Base_CLI_H_Files
   tubeCLIProgressReporter.h
   TubeTKLogo.h )
 
-set( TubeTK_Base_CLI_SRCS
-  tubeCLISharedLibraryWrapper.cxx )
+add_library(TubeCLI INTERFACE)
+target_include_directories( TubeCLI INTERFACE
+  ${CMAKE_CURRENT_SOURCE_DIR} )
+target_link_libraries( TubeCLI INTERFACE TubeTKCommon )
 
-add_custom_target( TubeCLI SOURCES
-  ${TubeTK_Base_CLI_H_Files}
-  ${TubeTK_Base_CLI_SRCS} )
-
-if( BUILD_TESTING )
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
+
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_CLI_H_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
+endif()

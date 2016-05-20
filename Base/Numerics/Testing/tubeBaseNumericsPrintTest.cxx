@@ -23,11 +23,12 @@ limitations under the License.
 
 #include "itktubeBasisFeatureVectorGenerator.h"
 #include "itktubeBlurImageFunction.h"
+#include "itktubeComputeImageSimilarityMetrics.h"
 #include "itktubeImageRegionMomentsCalculator.h"
 #include "itktubeJointHistogramImageFunction.h"
 #include "itktubeNJetFeatureVectorGenerator.h"
 #include "itktubeNJetImageFunction.h"
-#include "itktubeRidgeFeatureVectorGenerator.h"
+#include "itktubeRidgeFFTFeatureVectorGenerator.h"
 #include "itktubeVectorImageToListGenerator.h"
 #include "itktubeVotingResampleImageFunction.h"
 
@@ -42,26 +43,25 @@ int tubeBaseNumericsPrintTest( int itkNotUsed( argc ), char * itkNotUsed( argv )
     regionMomentsObject =
     itk::tube::ImageRegionMomentsCalculator< ImageType >::New();
   std::cout << "-------------itktubeImageRegionMomentsCalculator"
-            << regionMomentsObject
-            << std::endl;
+    << regionMomentsObject
+    << std::endl;
 
   itk::tube::JointHistogramImageFunction< ImageType >::Pointer
     jointHistoObject =
     itk::tube::JointHistogramImageFunction< ImageType >::New();
   std::cout << "-------------itktubeJointHistogramImageFunction"
-            << jointHistoObject
-            << std::endl;
+    << jointHistoObject
+    << std::endl;
 
   itk::tube::BlurImageFunction< ImageType >::Pointer tbif =
     itk::tube::BlurImageFunction< ImageType > ::New();
   std::cout << "-------------tbif" << tbif << std::endl;
 
-  itk::tube::NJetImageFunction< ImageType >::Pointer
-    nJetObject =
+  itk::tube::NJetImageFunction< ImageType >::Pointer nJetObject =
     itk::tube::NJetImageFunction< ImageType >::New();
   std::cout << "-------------itktubeNJetImageFunction"
-            << nJetObject
-            << std::endl;
+    << nJetObject
+    << std::endl;
 
   itk::tube::NJetFeatureVectorGenerator< ImageType >::Pointer
     nJetFeatureVectorGenerator =
@@ -75,28 +75,33 @@ int tubeBaseNumericsPrintTest( int itkNotUsed( argc ), char * itkNotUsed( argv )
   std::cout << "-------------BasisFeatureVectorGenerator"
     << basisFeatureVectorGenerator << std::endl;
 
-  itk::tube::RidgeFeatureVectorGenerator< ImageType >::Pointer
-    ridgeFeatureVectorGenerator =
-    itk::tube::RidgeFeatureVectorGenerator< ImageType >::New();
-  std::cout << "-------------RidgeFeatureVectorGenerator"
-    << ridgeFeatureVectorGenerator << std::endl;
-
+  itk::tube::RidgeFFTFeatureVectorGenerator< ImageType >::Pointer
+    ridgeFFTFeatureVectorGenerator =
+    itk::tube::RidgeFFTFeatureVectorGenerator< ImageType >::New();
+  std::cout << "-------------RidgeFFTFeatureVectorGenerator"
+    << ridgeFFTFeatureVectorGenerator << std::endl;
 
   itk::tube::Statistics::VectorImageToListGenerator< VectorImageType,
-      ImageType >::Pointer
-    vectorImageToListObject =
-    itk::tube::Statistics::VectorImageToListGenerator< VectorImageType,
-      ImageType >::New();
+    ImageType >::Pointer vectorImageToListObject =
+  itk::tube::Statistics::VectorImageToListGenerator< VectorImageType,
+    ImageType >::New();
   std::cout << "-------------itktubeVectorImageToListGenerator"
-            << vectorImageToListObject
-            << std::endl;
+    << vectorImageToListObject
+    << std::endl;
 
   itk::tube::VotingResampleImageFunction< ImageType >::Pointer
     votingResampleObject =
     itk::tube::VotingResampleImageFunction< ImageType >::New();
   std::cout << "-------------itktubeVotingResampleImageFunction"
-            << votingResampleObject
-            << std::endl;
+    << votingResampleObject
+    << std::endl;
+
+  itk::tube::ComputeImageSimilarityMetrics< ImageType >::Pointer
+    computeImageSimilarityObject =
+    itk::tube::ComputeImageSimilarityMetrics< ImageType >::New();
+  std::cout << "-------------itktubeComputeImageSimilarityMetrics"
+    << computeImageSimilarityObject
+    << std::endl;
 
   return EXIT_SUCCESS;
 }

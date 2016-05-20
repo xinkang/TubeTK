@@ -151,91 +151,90 @@ int itktubeNJetImageFunctionTest( int argc, char * argv[] )
       case 6:
         {
         func->Derivative( pnt, scale, d );
-        outIter.Set( d[0]+d[1] );
+        outIter.Set( d[0] );
         break;
         }
       case 7:
         {
         func->Derivative( pnt, v1, scale, d );
-        outIter.Set( d[0]+d[1] );
+        outIter.Set( d[0] );
         break;
         }
       case 8:
         {
         func->Derivative( pnt, v1, v2, scale, d );
-        outIter.Set( d[0]+d[1] );
+        outIter.Set( d[0] );
         break;
         }
       case 9:
         {
         func->DerivativeAtIndex( outIter.GetIndex(), scale, d );
-        outIter.Set( d[0]+d[1] );
+        outIter.Set( d[1] );
         break;
         }
       case 10:
         {
         func->DerivativeAtIndex( outIter.GetIndex(), v1, scale, d );
-        outIter.Set( d[0]+d[1] );
+        outIter.Set( d[1] );
         break;
         }
       case 11:
         {
         func->DerivativeAtIndex( outIter.GetIndex(), v1, v2, scale, d );
-        outIter.Set( d[0]+d[1] );
+        outIter.Set( d[1] );
         break;
         }
       case 12:
         {
         func->Derivative( pnt, scale, d );
         val = func->GetMostRecentIntensity();
-        outIter.Set( val+(d[0]+d[1]) );
+        outIter.Set( val );
         break;
         }
       case 13:
         {
         func->Derivative(pnt, v1, scale, d );
         val = func->GetMostRecentIntensity();
-        outIter.Set( val+(d[0]+d[1]) );
+        outIter.Set( d[0] );
         break;
         }
       case 14:
         {
         func->Derivative(pnt, v1, v2, scale, d );
         val = func->GetMostRecentIntensity();
-        outIter.Set( val+(d[0]+d[1]) );
+        outIter.Set( val );
         break;
         }
       case 15:
         {
         func->DerivativeAtIndex( outIter.GetIndex(), scale, d );
         val = func->GetMostRecentIntensity();
-        outIter.Set( val+(d[0]+d[1]) );
+        outIter.Set( d[1] );
         break;
         }
       case 16:
         {
         func->DerivativeAtIndex( outIter.GetIndex(), v1, scale, d );
         val = func->GetMostRecentIntensity();
-        outIter.Set( val+(d[0]+d[1]) );
+        outIter.Set( d[1] );
         break;
         }
       case 17:
         {
         func->DerivativeAtIndex( outIter.GetIndex(), v1, v2, scale, d );
-        val = func->GetMostRecentIntensity();
-        outIter.Set( val+(d[0]+d[1]) );
+        outIter.Set( d[1] );
         break;
         }
       case 18:
         {
         val = func->Jet( pnt, d, h, scale );
-        outIter.Set( val+d[0]+d[1]+(h[0][0]+h[1][1]) );
+        outIter.Set( h[0][0] );
         break;
         }
       case 19:
         {
         val = func->JetAtIndex( outIter.GetIndex(), d, h, scale );
-        outIter.Set( val+d[0]+d[1]+(h[0][0]+h[1][1]) );
+        outIter.Set( h[1][1] );
         break;
         }
       case 20:
@@ -267,24 +266,22 @@ int itktubeNJetImageFunctionTest( int argc, char * argv[] )
         }
       case 24:
         {
-        val = func->Ridgeness( pnt, scale );
-        val *= func->GetMostRecentRidgeLevelness();
-        val *= func->GetMostRecentRidgeRoundness();
-        val *= func->GetMostRecentRidgeCurvature();
+        val = func->RidgenessAtIndex( outIter.GetIndex(), v1, v2, scale );
         outIter.Set( val );
         break;
         }
       case 25:
         {
         val = func->RidgenessAtIndex( outIter.GetIndex(), v1, v2, scale );
-        outIter.Set( val );
+        d = func->GetMostRecentDerivative();
+        outIter.Set( val+d[1] );
         break;
         }
       case 26:
         {
         val = func->RidgenessAtIndex( outIter.GetIndex(), v1, v2, scale );
         h = func->GetMostRecentHessian();
-        outIter.Set( h[0][0] * h[1][1] + h[0][1] * h[1][0] );
+        outIter.Set( h[0][0] );
         break;
         }
       case 27:
@@ -338,7 +335,7 @@ int itktubeNJetImageFunctionTest( int argc, char * argv[] )
           {
           d.Fill( 0 );
           }
-        outIter.Set( val+d[0]+d[1] );
+        outIter.Set( d[0] );
         break;
         }
       case 30:
@@ -353,7 +350,7 @@ int itktubeNJetImageFunctionTest( int argc, char * argv[] )
           {
           d.Fill( 0 );
           }
-        outIter.Set( val+d[0]+d[1] );
+        outIter.Set( val );
         break;
         }
       case 31:
@@ -368,40 +365,46 @@ int itktubeNJetImageFunctionTest( int argc, char * argv[] )
           {
           d.Fill( 0 );
           }
-        outIter.Set( val+d[0]+d[1] );
+        outIter.Set( d[1] );
         break;
         }
       case 32:
         {
         func->Hessian( pnt, scale, h );
-        outIter.Set( h[0][0]+h[1][1] );
+        outIter.Set( h[0][0] );
         break;
         }
       case 33:
         {
         func->Hessian( pnt, v1, scale, h );
-        outIter.Set( h[0][0]+h[1][1] );
+        outIter.Set( h[0][0] );
         break;
         }
       case 34:
         {
         func->Hessian( pnt, v1, v2, scale, h );
-        outIter.Set( h[0][0]+h[1][1] );
+        outIter.Set( h[0][0] );
         break;
         }
       case 35:
         {
         func->HessianAtIndex( outIter.GetIndex(), scale, h );
-        outIter.Set( h[0][0]+h[1][1] );
+        outIter.Set( h[0][1] );
         break;
         }
       case 36:
+        {
+        func->Hessian( pnt, scale, h );
+        outIter.Set( h[0][1] );
+        break;
+        }
+      case 37:
         {
         func->HessianAtIndex( outIter.GetIndex(), v1, scale, h );
         outIter.Set( h[0][0]+h[1][1] );
         break;
         }
-      case 37:
+      case 38:
         {
         func->HessianAtIndex( outIter.GetIndex(), v1, v2, scale, h );
         outIter.Set( h[0][0]+h[1][1] );

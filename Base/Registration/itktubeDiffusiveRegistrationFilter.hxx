@@ -108,7 +108,7 @@ DiffusiveRegistrationFilter
   os << indent << "Multiplication vector images:" << std::endl;
   for( int i = 0; i < this->GetNumberOfTerms(); i++ )
     {
-    if( m_MultiplicationVectorImageArrays[i].Length != 0 )
+    if( m_MultiplicationVectorImageArrays[i].Size() != 0 )
       {
       for( unsigned int j = 0; j < ImageDimension; j++ )
         {
@@ -370,7 +370,7 @@ DiffusiveRegistrationFilter
     ScalarDerivativeImageArrayType deformationComponentFirstArray;
     TensorDerivativeImageArrayType deformationComponentSecondArray;
     DeformationVectorImageArrayType multiplicationVectorArray;
-    for( int j = 0; j < ImageDimension; j++ )
+    for( unsigned int j = 0; j < ImageDimension; j++ )
       {
       deformationComponentFirstArray[j] = 0;
       deformationComponentSecondArray[j] = 0;
@@ -430,7 +430,7 @@ DiffusiveRegistrationFilter
   m_DeformationComponentImages[GAUSSIAN] = output;
 
   // Setup the first and second order deformation component images
-  for( int i = 0; i < ImageDimension; i++ )
+  for( unsigned int i = 0; i < ImageDimension; i++ )
     {
     m_DeformationComponentFirstOrderDerivativeArrays[GAUSSIAN][i]
         = ScalarDerivativeImageType::New();
@@ -589,7 +589,7 @@ DiffusiveRegistrationFilter
     DiffusiveRegistrationFilterUtils::ExtractXYZComponentsFromDeformationField(
           this->GetDeformationComponentImage(i), deformationComponentImageArray );
 
-    for( int j = 0; j < ImageDimension; j++ )
+    for( unsigned int j = 0; j < ImageDimension; j++ )
       {
       this->ComputeDeformationComponentDerivativeImageHelper(
           deformationComponentImageArray[j], i, j, spacing, radius );
@@ -1176,11 +1176,11 @@ DiffusiveRegistrationFilter
         localUpdateMetricsIntermediate.SumOfSquaredRegularizationUpdateMagnitude
             += squaredRegularizationUpdateMagnitude;
         localUpdateMetricsIntermediate.SumOfTotalUpdateMagnitude
-            += vcl_sqrt( squaredTotalUpdateMagnitude );
+            += std::sqrt( squaredTotalUpdateMagnitude );
         localUpdateMetricsIntermediate.SumOfIntensityDistanceUpdateMagnitude
-            += vcl_sqrt( squaredIntensityDistanceUpdateMagnitude );
+            += std::sqrt( squaredIntensityDistanceUpdateMagnitude );
         localUpdateMetricsIntermediate.SumOfRegularizationUpdateMagnitude
-            += vcl_sqrt( squaredRegularizationUpdateMagnitude );
+            += std::sqrt( squaredRegularizationUpdateMagnitude );
         }
 
       // Go to the next neighborhood
@@ -1548,13 +1548,13 @@ DiffusiveRegistrationFilter
     }
   else
     {
-    m_UpdateMetrics.RMSTotalUpdateMagnitude = vcl_sqrt(
+    m_UpdateMetrics.RMSTotalUpdateMagnitude = std::sqrt(
           m_UpdateMetrics.IntermediateStruct.SumOfSquaredTotalUpdateMagnitude
           / numPixels );
-    m_UpdateMetrics.RMSIntensityDistanceUpdateMagnitude = vcl_sqrt(
+    m_UpdateMetrics.RMSIntensityDistanceUpdateMagnitude = std::sqrt(
           m_UpdateMetrics.IntermediateStruct.SumOfSquaredIntensityDistanceUpdateMagnitude
           / numPixels );
-    m_UpdateMetrics.RMSRegularizationUpdateMagnitude = vcl_sqrt(
+    m_UpdateMetrics.RMSRegularizationUpdateMagnitude = std::sqrt(
           m_UpdateMetrics.IntermediateStruct.SumOfSquaredRegularizationUpdateMagnitude
           / numPixels );
     m_UpdateMetrics.MeanTotalUpdateMagnitude

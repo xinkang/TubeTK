@@ -23,50 +23,60 @@
 
 project( TubeTKIO )
 
-find_package( ITK REQUIRED )
-include( ${ITK_USE_FILE} )
-
 set( TubeTK_Base_IO_H_Files
   itktubeMetaLDA.h
   itktubeMetaNJetLDA.h
   itktubeMetaClassPDF.h
   itktubeMetaRidgeSeed.h
-  itktubeMetaTubeParams.h
-  itktubeRidgeSeedFilterIO.h )
+  itktubeMetaTubeExtractor.h
+  itktubePDFSegmenterParzenIO.h
+  itktubeTubeExtractorIO.h
+  itktubeTubeXIO.h )
+if( TubeTK_USE_LIBSVM )
+  list( APPEND TubeTK_Base_IO_H_Files
+    itktubeRidgeSeedFilterIO.h
+    itktubePDFSegmenterSVMIO.h )
+endif( TubeTK_USE_LIBSVM )
 
 set( TubeTK_Base_IO_HXX_Files
-  itktubeRidgeSeedFilterIO.hxx )
-
-include_directories(
-  ${TubeTK_SOURCE_DIR}/Base/Segmentation
-  ${TubeTK_SOURCE_DIR}/Base/Numerics
-  ${TubeTK_SOURCE_DIR}/Base/Common )
+  itktubePDFSegmenterParzenIO.hxx
+  itktubeTubeExtractorIO.hxx
+  itktubeTubeXIO.hxx )
+if( TubeTK_USE_LIBSVM )
+  list( APPEND TubeTK_Base_IO_HXX_Files
+    itktubeRidgeSeedFilterIO.hxx
+    itktubePDFSegmenterSVMIO.hxx )
+endif( TubeTK_USE_LIBSVM )
 
 set( TubeTK_Base_IO_SRCS
+  itktubeMetaClassPDF.cxx
   itktubeMetaLDA.cxx
   itktubeMetaNJetLDA.cxx
   itktubeMetaRidgeSeed.cxx
-  itktubeMetaClassPDF.cxx
-  itktubeMetaTubeParams.cxx )
+  itktubeMetaTubeExtractor.cxx )
 
-add_library( TubeTKIO STATIC
+add_library( ${PROJECT_NAME} STATIC
   ${TubeTK_Base_IO_H_Files}
   ${TubeTK_Base_IO_HXX_Files}
   ${TubeTK_Base_IO_SRCS} )
 
-target_link_libraries( TubeTKIO ${ITK_LIBRARIES} )
+target_link_libraries( ${PROJECT_NAME} PUBLIC TubeTKCommon TubeTKNumerics TubeTKSegmentation )
 
-set( TARGETS TubeTKIO )
-TubeTKMacroInstallPlugins( ${TARGETS} )
+target_include_directories( ${PROJECT_NAME} PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR} )
 
-if( BUILD_TESTING )
+if( TubeTK_BUILD_TESTING )
   add_subdirectory( Testing )
-endif( BUILD_TESTING )
+endif( TubeTK_BUILD_TESTING )
 
-install( FILES
-  ${TubeTK_Base_Numerics_H_Files}
-  ${TubeTK_Base_Numerics_HXX_Files}
-  DESTINATION include )
+if( TubeTK_INSTALL_DEVELOPMENT )
+  install( FILES
+    ${TubeTK_Base_Numerics_H_Files}
+    ${TubeTK_Base_Numerics_HXX_Files}
+    DESTINATION ${TubeTK_INSTALL_INCLUDE_DIR}
+    COMPONENT Development )
 
-# Export target
-set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS TubeTKIO )
+  TubeTKMacroInstallPlugins( ${PROJECT_NAME} )
+endif()
+
+set_property( GLOBAL APPEND PROPERTY TubeTK_TARGETS ${PROJECT_NAME} )

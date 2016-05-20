@@ -27,31 +27,41 @@ set( TubeTK_${proj}_MODULES
   AtlasBuilderUsingIntensity
   ComputeBinaryImageSimilarityMetrics
   ComputeImageSimilarityMetrics
-  ComputeImageStatisticsUsingMask
+  ComputeImageStatistics
+  ComputeImageToTubeRigidMetricImage
   ComputeSegmentTubesParameters
+  ComputeTrainingMask
+  ComputeTubeFlyThroughImage
   ComputeTubeGraphProbability
+  ComputeTubeMeasures
   ComputeTubeProbability
+  ConvertCSVToImages
+  ConvertImagesToCSV
   ConvertInnerOpticToPlus
   ConvertShrunkenSeedImageToList
   ConvertToMetaImage
-  ConvertTubeGraphToImage
+  ConvertTRE
+  ConvertSpatialGraphToImage
   ConvertTubesToDensityImage
   ConvertTubesToImage
+  ConvertTubesToTubeTree
   ConvertTubeToTubeGraph
   CropImage
+  CropTubes
   DeblendTomosynthesisSlicesUsingPrior
   EnhanceCoherenceAndEdgesUsingDiffusion
   EnhanceCoherenceUsingDiffusion
   EnhanceContrastUsingPrior
   EnhanceEdgesUsingDiffusion
   EnhanceTubesUsingDiffusion
-  EnhanceTubesUsingDiscriminantAnalysis
   EnhanceUsingDiscriminantAnalysis
   EnhanceUsingNJetDiscriminantAnalysis
+  ExtractMetricImageSlice
   ImageMath
   MergeAdjacentImages
   MergeTubeGraphs
   ResampleImage
+  ResampleTubes
   RegisterImages
   RegisterImageToTubesUsingRigidTransform
   RegisterUsingImageCenters
@@ -59,30 +69,49 @@ set( TubeTK_${proj}_MODULES
   SegmentBinaryImageSkeleton
   SegmentConnectedComponents
   SegmentConnectedComponentsUsingParzenPDFs
-  SegmentTubeSeeds
   SegmentTubes
+  SegmentTubeUsingMinimalPath
   SegmentUsingOtsuThreshold
   ShrinkImage
   SimulateAcquisitionArtifactsUsingPrior
-  SubSampleTubes
-  TransformTubes )
+  TubeMath
+  TreeMath )
+
+set( TubeTK_${proj}_ImageViewer_MODULES "" )
+if( TubeTK_BUILD_IMAGE_VIEWER )
+  set( TubeTK_${proj}_ImageViewer_MODULES
+     ImageEditor )
+  list( APPEND TubeTK_${proj}_MODULES
+    ${TubeTK_${proj}_ImageViewer_MODULES} )
+endif( TubeTK_BUILD_IMAGE_VIEWER)
 
 set( TubeTK_${proj}_Boost_MODULES )
 if( TubeTK_USE_BOOST )
   set( TubeTK_${proj}_Boost_MODULES
-    ComputeImageQuantiles
     ComputeRegionSignatures
-    ComputeTubeGraphSimilarityKernelMatrix
     SegmentUsingQuantileThreshold
     TransferLabelsToRegions )
+  if( TubeTK_USE_JsonCpp )
+    list(TubeTK_${proj}_Boost_MODULES
+      ComputeTubeGraphSimilarityKernelMatrix )
+  endif( TubeTK_USE_JsonCpp )
   list( APPEND TubeTK_${proj}_MODULES
     ${TubeTK_${proj}_Boost_MODULES} )
 endif( TubeTK_USE_BOOST )
+
+set( TubeTK_${proj}_LIBSVM_MODULES )
+if( TubeTK_USE_LIBSVM )
+  set( TubeTK_${proj}_LIBSVM_MODULES
+    EnhanceTubesUsingDiscriminantAnalysis )
+  list( APPEND TubeTK_${proj}_MODULES
+    ${TubeTK_${proj}_LIBSVM_MODULES} )
+endif( TubeTK_USE_LIBSVM )
 
 set( TubeTK_${proj}_VTK_MODULES )
 if( TubeTK_USE_VTK )
   set( TubeTK_${proj}_VTK_MODULES
     ConvertTubesToSurface
+    ComputeTubeTortuosityMeasures
     RegisterUsingSlidingGeometries )
   list( APPEND TubeTK_${proj}_MODULES
     ${TubeTK_${proj}_VTK_MODULES} )

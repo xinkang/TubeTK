@@ -31,178 +31,124 @@ namespace tube
 {
 
 /** Compute the tangent of the centerline of the tube */
-template< class TTube >
-bool  ComputeTubeTangentsAndNormals( TTube * tube )
+template< class TTubePoint >
+void
+ComputeNormalsFromTangent( TTubePoint & tubePoint,
+  const typename TTubePoint::VectorType & prevT )
 {
-  typedef typename TTube::PointType             PointType;
-  typedef typename TTube::TubePointType         TubePointType;
-  typedef typename TTube::VectorType            VectorType;
-  typedef typename TTube::CovariantVectorType   CovariantVectorType;
+  typedef typename TTubePoint::VectorType            VectorType;
+  typedef typename TTubePoint::CovariantVectorType   CovariantVectorType;
 
-  unsigned int dimension = tube->GetObjectDimension();
+  unsigned int dimension = tubePoint.GetPosition().GetPointDimension();
 
-  int length = tube->GetNumberOfPoints();
-  if( length == 0 )
+  VectorType t = tubePoint.GetTangent();
+  t.Normalize();
+
+  if( t.GetNorm() == 0 )
     {
-    return false;
-    }
+    if( prevT.GetNorm() != 0 )
+      {
+      t = prevT;
+      t.Normalize();
+      }
+    else
+      {
+      t.Fill( 0 );
+      t[0] = 1;
+      }
+    tubePoint.SetTangent(t);
 
-  PointType x1, x3;
-  VectorType t;
-  t.Fill( 0.0 );
+    CovariantVectorType n1;
+    CovariantVectorType n2;
 
-  if( length == 1 )
-    {
-    t[dimension-1] = 1;
-    ((TubePointType *)(tube->GetPoint(0)))->SetTangent(t);
-    t[dimension-1] = 0;
-    CovariantVectorType n;
-    n.Fill( 0.0 );
-    n[0] = 1;
-    ((TubePointType *)(tube->GetPoint(0)))->SetNormal1(n);
+    n2.SetVnlVector( ::tube::ComputeOrthogonalVector( t.GetVnlVector() )
+      .normalize() );
+    tubePoint.SetNormal2(n2);
+
     if( dimension == 3 )
       {
-      n.Fill( 0.0 );
-      n[1] = 1;
-      ((TubePointType *)(tube->GetPoint(0)))->SetNormal2(n);
+      n1.SetVnlVector( ::tube::ComputeCrossVector( t.GetVnlVector(),
+        n2.GetVnlVector() ).normalize() );
+      if( n1[0] != n1[0] )
+        {
+        n1.Fill( 0 );
+        n1[0] = 1;
+        }
+      tubePoint.SetNormal1(n1);
       }
-    return true;
+
+    return;
     }
-
-  unsigned int it1 = 0;
-  unsigned int it2 = 1;
-  unsigned int it3 = 2;
-
-  while(it3 < (unsigned int)length)
-    {
-    x1 = tube->GetPoint(it1)->GetPosition();
-    x3 = tube->GetPoint(it3)->GetPosition();
-    double l=0;
-    for(unsigned int i=0; i<dimension; i++)
-      {
-      t[i] = (x3[i] - x1[i]);
-      l = l + t[i]*t[i];
-      }
-
-    l = vcl_sqrt(l);
-    if(l <= 0.0001)
-      {
-      std::cerr << "TubeSpatialObject::ComputeTangentAndNormals() : ";
-      std::cerr << "length between two consecutive points is 0";
-      std::cerr << " (use RemoveDuplicatePoints())" << std::endl;
-      std::cerr << "   p1 = " << x1 << std::endl;
-      std::cerr << "   p3 = " << x3 << std::endl;
-      return false;
-      }
-    for(unsigned int i=0; i<dimension; i++)
-      {
-      t[i] /= l;
-      }
-
-    ((TubePointType*)(tube->GetPoint(it2)))->SetTangent(t);
-    it1++;
-    it2++;
-    it3++;
-    }
-
-  it1 = 0;
-  it2 = 1;
-  t = ((TubePointType*)(tube->GetPoint(it2)))->GetTangent();
-  ((TubePointType*)(tube->GetPoint(it1)))->SetTangent(t);
-  it1 = length-1;
-  it2 = length-2;
-  t = ((TubePointType*)(tube->GetPoint(it2)))->GetTangent();
-  ((TubePointType*)(tube->GetPoint(it1)))->SetTangent(t);
 
   // Compute the normal
   CovariantVectorType n1;
   CovariantVectorType n2;
 
-  it1 = 0;
-  while( it1 < (unsigned int)length-1 )
-    {
-    t = ((TubePointType*)(tube->GetPoint(it1)))->GetTangent();
-
-    if( dimension == 2 )
-      {
-      t = ((TubePointType*)(tube->GetPoint(it1)))->GetTangent();
-      n1[0] = -t[1];
-      n1[1] = t[0];
-      ((TubePointType*)(tube->GetPoint(it1)))->SetNormal1(n1);
-      }
-    else if( dimension == 3 )
-      {
-      CovariantVectorType tt;
-
-      it2 = it1+1;
-      while( it2 < (unsigned int)length )
-        {
-        tt[0] = ((TubePointType*)(tube->GetPoint(it2)))->GetTangent()[0];
-        tt[1] = ((TubePointType*)(tube->GetPoint(it2)))->GetTangent()[1];
-        tt[2] = ((TubePointType*)(tube->GetPoint(it2)))->GetTangent()[2];
-        tt.Normalize();
-        if( tt[0] != t[0] || tt[1] != t[1] || tt[2] != t[2] )
-          {
-          break;
-          }
-        ++it2;
-        }
-      if( it2 == (unsigned int)length )
-        {
-        tt[0] = t[0]+0.5;
-        tt[1] = t[1]+0.5;
-        tt[2] = t[2];
-        tt.Normalize();
-        }
-
-      vnl_vector< double > vv = ::tube::ComputeCrossVector( t.GetVnlVector(),
-        tt.GetVnlVector() );
-      n2[0] = vv[0];
-      n2[1] = vv[1];
-      n2[2] = vv[2];
-      n2.Normalize();
-
-      vv = ::tube::ComputeCrossVector( t.GetVnlVector(), n2.GetVnlVector() );
-      n1[0] = vv[0];
-      n1[1] = vv[1];
-      n1[2] = vv[2];
-      n1.Normalize();
-
-      ((TubePointType*)(tube->GetPoint(it1)))->SetNormal1(n1);
-      ((TubePointType*)(tube->GetPoint(it1)))->SetNormal2(n2);
-      }
-
-    it1++;
-    }
-
-  it1 = length-1;
   if( dimension == 2 )
     {
-    t = ((TubePointType*)(tube->GetPoint(it1)))->GetTangent();
-    n1[0] = -t[1];
-    n1[1] = t[0];
-    ((TubePointType*)(tube->GetPoint(it1)))->SetNormal1(n1);
+    n1.SetVnlVector( ::tube::ComputeOrthogonalVector( t.GetVnlVector() )
+      .normalize() );
+    if( n1 * prevT < 0 )
+      {
+      n1 *= -1;
+      }
+    tubePoint.SetNormal1( n1 );
     }
   else if( dimension == 3 )
     {
-    it2 = length-2;
-    n1 = ((TubePointType*)(tube->GetPoint(it2)))->GetNormal1();
-    n2 = ((TubePointType*)(tube->GetPoint(it2)))->GetNormal2();
-    ((TubePointType*)(tube->GetPoint(it1)))->SetNormal1(n1);
-    ((TubePointType*)(tube->GetPoint(it1)))->SetNormal2(n2);
+    CovariantVectorType tt;
+
+    tt[0] = prevT[0];
+    tt[1] = prevT[1];
+    tt[2] = prevT[2];
+    tt.Normalize();
+
+    vnl_vector< double > vv = ::tube::ComputeCrossVector(
+      t.GetVnlVector(), tt.GetVnlVector() );
+    if( t * prevT > 0.99999 )
+      {
+      vv = ::tube::ComputeOrthogonalVector( t.GetVnlVector() );
+      }
+    n2[0] = vv[0];
+    n2[1] = vv[1];
+    n2[2] = vv[2];
+    n2.Normalize();
+
+    vv = ::tube::ComputeCrossVector( t.GetVnlVector(), n2.GetVnlVector() );
+    n1[0] = vv[0];
+    n1[1] = vv[1];
+    n1[2] = vv[2];
+    n1.Normalize();
+
+    VectorType tDiff = t - prevT;
+    if( n1 * tDiff < 0 )
+      {
+      n1 *= -1;
+      n2 *= -1;
+      }
+    tubePoint.SetNormal1( n1 );
+    tubePoint.SetNormal2( n2 );
     }
 
-  return true;
+  return;
+}
+
+/** Compute the tangent of the centerline of the tube */
+template< class TTube >
+bool
+ComputeTubeTangentsAndNormals( typename TTube::Pointer & tube )
+{
+  typename TTube::PointListType & pointList = tube->GetPoints();
+  return ComputeVectorTangentsAndNormals( pointList );
 }
 
 /** Compute the tangent of the centerline of the tube */
 template< class TTubePoint >
-bool  ComputeVectorTangentsAndNormals( std::vector< TTubePoint > & tubeV )
+bool
+ComputeVectorTangentsAndNormals( std::vector< TTubePoint > & tubeV )
 {
-  typedef TTubePoint                                 TubePointType;
   typedef typename TTubePoint::PointType             PointType;
   typedef typename TTubePoint::VectorType            VectorType;
-  typedef typename TTubePoint::CovariantVectorType   CovariantVectorType;
 
   unsigned int dimension = tubeV[0].GetPosition().GetPointDimension();
 
@@ -218,19 +164,8 @@ bool  ComputeVectorTangentsAndNormals( std::vector< TTubePoint > & tubeV )
 
   if( length == 1 )
     {
-    t[dimension-1] = 1;
-    tubeV[0].SetTangent(t);
-    t[dimension-1] = 0;
-    CovariantVectorType n;
-    n.Fill( 0.0 );
-    n[0] = 1;
-    tubeV[0].SetNormal1(n);
-    if( dimension == 3 )
-      {
-      n.Fill( 0.0 );
-      n[1] = 1;
-      tubeV[0].SetNormal2(n);
-      }
+    t[0] = 1;
+    ::tube::ComputeNormalsFromTangent( tubeV[0], t );
     return true;
     }
 
@@ -242,32 +177,35 @@ bool  ComputeVectorTangentsAndNormals( std::vector< TTubePoint > & tubeV )
     {
     x1 = tubeV[it1].GetPosition();
     x3 = tubeV[it3].GetPosition();
-    double l=0;
+    double l = 0;
     for(unsigned int i=0; i<dimension; i++)
       {
       t[i] = (x3[i] - x1[i]);
       l = l + t[i]*t[i];
       }
 
-    l = vcl_sqrt(l);
+    l = std::sqrt(l);
     if(l < 0.0001)
       {
-      std::cerr << "TubeSpatialObject::ComputeTangentAndNormals() : ";
+      std::cerr << "tubeTubeMath::ComputeVectorTangentsAndNormals() : ";
       std::cerr << "length between two consecutive points is 0";
       std::cerr << " (use RemoveDuplicatePoints())" << std::endl;
       std::cerr << "   p1 = " << x1 << std::endl;
       std::cerr << "   p3 = " << x3 << std::endl;
-      return false;
+      t = tubeV[it1].GetTangent();
       }
-    for(unsigned int i=0; i<dimension; i++)
+    else
       {
-      t[i] /= l;
+      for(unsigned int i=0; i<dimension; i++)
+        {
+        t[i] /= l;
+        }
       }
 
     tubeV[it2].SetTangent(t);
-    it1++;
-    it2++;
-    it3++;
+    ++it1;
+    ++it2;
+    ++it3;
     }
 
   it1 = 0;
@@ -279,120 +217,267 @@ bool  ComputeVectorTangentsAndNormals( std::vector< TTubePoint > & tubeV )
   t = tubeV[it2].GetTangent();
   tubeV[it1].SetTangent(t);
 
-
-  // Compute the normal
-  CovariantVectorType n1;
-  CovariantVectorType n2;
-
   it1 = 0;
   while(it1 < length-1)
     {
-    t = tubeV[it1].GetTangent();
+    t = tubeV[it1+1].GetTangent();
 
-    if( dimension == 2 )
-      {
-      t = tubeV[it1].GetTangent();
-      n1[0] = -t[1];
-      n1[1] = t[0];
-      tubeV[it1].SetNormal1(n1);
-      }
-    else if( dimension == 3 )
-      {
-      CovariantVectorType tt;
-
-      it2 = it1+1;
-      while( it2 < length )
-        {
-        tt[0] = tubeV[it2].GetTangent()[0];
-        tt[1] = tubeV[it2].GetTangent()[1];
-        tt[2] = tubeV[it2].GetTangent()[2];
-        tt.Normalize();
-        if( vnl_math_abs(tt[0] - t[0]) > 0.0001
-          || vnl_math_abs(tt[1] - t[1]) > 0.0001
-          || vnl_math_abs(tt[2] - t[2]) > 0.0001 )
-          {
-          break;
-          }
-        ++it2;
-        }
-      if( it2 >= length )
-        {
-        it2 = it1-1;
-        while( it2 >= 0 )
-          {
-          tt[0] = tubeV[it2].GetTangent()[0];
-          tt[1] = tubeV[it2].GetTangent()[1];
-          tt[2] = tubeV[it2].GetTangent()[2];
-          tt.Normalize();
-          if( vnl_math_abs(tt[0] - t[0]) > 0.0001
-            || vnl_math_abs(tt[1] - t[1]) > 0.0001
-            || vnl_math_abs(tt[2] - t[2]) > 0.0001 )
-            {
-            break;
-            }
-          --it2;
-          }
-        if( it2 < 0 )
-          {
-          tt[0] = t[1]+0.5;
-          tt[1] = t[0]-0.5;
-          tt[2] = t[2];
-          tt.Normalize();
-          std::cout << "Warning: Ilconditioned frenet frame, linear tube."
-            << std::endl;
-          }
-        }
-
-      vnl_vector< double > vv = ::tube::ComputeCrossVector( t.GetVnlVector(),
-        tt.GetVnlVector() );
-      n2[0] = vv[0];
-      n2[1] = vv[1];
-      n2[2] = vv[2];
-      n2.Normalize();
-      if( vnl_math_abs(n2.GetNorm() - 1) > 0.0001 )
-        {
-        std::cout << "Warning: Normal direction no unit."
-          << std::endl;
-        std::cout << "  n2 = " << n2 << std::endl;
-        }
-
-      vv = ::tube::ComputeCrossVector( t.GetVnlVector(), n2.GetVnlVector() );
-      n1[0] = vv[0];
-      n1[1] = vv[1];
-      n1[2] = vv[2];
-      n1.Normalize();
-      if( vnl_math_abs(n1.GetNorm() - 1) > 0.0001 )
-        {
-        std::cout << "Warning: Normal direction no unit."
-          << std::endl;
-        std::cout << "  n1 = " << n1 << std::endl;
-        }
-
-      tubeV[it1].SetNormal1(n1);
-      tubeV[it1].SetNormal2(n2);
-      }
+    ::tube::ComputeNormalsFromTangent( tubeV[it1], t );
 
     ++it1;
     }
 
   it1 = length-1;
-  if( dimension == 2 )
-    {
-    t = tubeV[it1].GetTangent();
-    n1[0] = -t[1];
-    n1[1] = t[0];
-    tubeV[it1].SetNormal1(n1);
-    }
-  else if( dimension == 3 )
-    {
-    it2 = length-2;
-    n1 = tubeV[it2].GetNormal1();
-    n2 = tubeV[it2].GetNormal2();
-    tubeV[it1].SetNormal1(n1);
-    tubeV[it1].SetNormal2(n2);
-    }
+  it2 = length-2;
+  ::tube::ComputeNormalsFromTangent( tubeV[it1], tubeV[it2].GetTangent() );
 
   return true;
+}
+
+/**
+ * Smooth a tube */
+template< class TTube >
+typename TTube::Pointer
+SmoothTube( const typename TTube::Pointer & tube, double h,
+  SmoothTubeFunctionEnum smoothFunction )
+{
+  typename TTube::PointType avg;
+
+  typename TTube::PointListType & pointList = tube->GetPoints();
+  typename TTube::PointListType::iterator pointItr;
+  typename TTube::PointListType::iterator tmpPointItr;
+
+  typename TTube::PointListType::iterator beginItr = pointList.begin();
+  typename TTube::PointListType::iterator endItr = pointList.end();
+
+  typename TTube::Pointer newTube = TTube::New();
+  newTube->CopyInformation( tube );
+
+  typename TTube::PointListType newPointList;
+
+  if( h == 0 )
+    {
+    return newTube;
+    }
+
+  std::vector< double > w;
+  int wSize = 0;
+
+  if(smoothFunction == SMOOTH_TUBE_USING_INDEX_AVERAGE ||
+     smoothFunction == SMOOTH_TUBE_USING_INDEX_GAUSSIAN )
+    {
+    // Calculate the weighing window w
+    if( smoothFunction == SMOOTH_TUBE_USING_INDEX_AVERAGE )
+      {
+      int maxIndex = static_cast< int >( h );
+      wSize = 2 * maxIndex + 1;
+      w.resize(wSize, 1.0);
+      }
+    else
+      {
+      // Standard Deviation
+      double sigma = h;
+      // Consider the points until 3*sigma
+      int maxIndex = static_cast< int >( 3*sigma );
+      wSize = 2 * maxIndex + 1;
+      w.resize( wSize, 0.0 );
+      for(int i = 0; i <= maxIndex; i++)
+        {
+        // The multiplication term 1/sigma*sqrt(2*pi) isn't necessary
+        // since we normalize at the end by the sum of w
+        w[maxIndex+i] = exp(-i*i/(2.0*sigma*sigma));
+        w[maxIndex-i] = w[maxIndex+i];
+        }
+      }
+
+    // Apply the weighing window
+    int count = 0;
+    unsigned int pointDimension = TTube::ObjectDimension;
+    for( pointItr = beginItr; pointItr != endItr; ++pointItr )
+      {
+      typename TTube::TubePointType newPoint = *pointItr;
+      double wTotal = 0;
+      avg.Fill( 0 );
+      tmpPointItr = pointItr;
+      int wCenter = (wSize-1)/2;
+
+      // Place the tmpPointItr at the beginning of the window
+      tmpPointItr -= std::min( count, wCenter );
+
+      // Place the window iterator so that the window center
+      // is aligned to the current point.
+      int pos = std::max( wCenter - count, 0 );
+
+      // Compute the average over the window, weighing with w
+      while( pos < wSize && tmpPointItr != endItr )
+        {
+        for( unsigned int j=0; j<pointDimension; ++j )
+          {
+          avg[j] += w[pos] * tmpPointItr->GetPosition()[j];
+          }
+        wTotal += w[pos];
+        ++pos;
+        ++tmpPointItr;
+        }
+
+      // Divide by sum of weights -> finish average
+      if( wTotal > 0 )
+        {
+        for( unsigned int i=0; i<pointDimension; ++i )
+          {
+          avg[i] /= wTotal;
+          }
+        // Update the new point coordinates
+        newPoint.SetPosition( avg );
+        }
+
+      newPointList.push_back( newPoint );
+      ++count;
+      }
+    }
+
+  if( smoothFunction == SMOOTH_TUBE_USING_DISTANCE_GAUSSIAN )
+    {
+    // // Set w for Gaussians
+    // double sigma = h;
+    // double dist = (pointItr->GetPosition()-tmpPointItr->GetPosition()).GetNorm();
+    // w[pos] = 1/(sigma*2.50663)*exp(-dist*dist/(2.0*sigma*sigma));
+
+    // TODO : Finish implementation
+    std::cerr<<" Smoothing method not yet implemented. Please choose another one.\n";
+    return NULL;
+    }
+
+  newTube->SetPoints( newPointList );
+  tube::ComputeTubeTangentsAndNormals< TTube >( newTube );
+
+  return newTube;
+}
+
+
+/** Remove duplicate points */
+template< class TTube >
+int
+RemoveDuplicateTubePoints( typename TTube::Pointer & tube )
+{
+  int length = tube->GetNumberOfPoints();
+
+  if ( length <= 1 )
+    {
+    return 0;
+    }
+
+  int nPoints = 0;
+  for ( int i = 0; i < length - 1; i++ )
+    {
+    if ( tube->GetPoint(i)->GetPosition() ==
+      tube->GetPoint(i + 1)->GetPosition() )
+      {
+      tube->RemovePoint(i + 1);
+      i--;
+      length--;
+      nPoints++;
+      }
+    if ( i >= 0 && i < length - 2
+         && tube->GetPoint(i)->GetPosition() ==
+         tube->GetPoint(i + 2)->GetPosition() )
+      {
+      tube->RemovePoint(i + 2);
+      i--;
+      length--;
+      nPoints++;
+      }
+    }
+
+  return nPoints;
+}
+
+/**
+ * Subsample a tube */
+template< class TTube >
+typename TTube::Pointer
+SubsampleTube( const typename TTube::Pointer & tube, int N )
+{
+  typename TTube::PointListType & pointList = tube->GetPoints();
+  typename TTube::PointListType::iterator pointItr;
+
+  typename TTube::PointListType::iterator beginItr = pointList.begin();
+  typename TTube::PointListType::iterator endItr = pointList.end();
+
+  typename TTube::Pointer newTube = TTube::New();
+  newTube->CopyInformation( tube );
+
+  typename TTube::PointListType newPointList;
+
+  // Cannot subsample by 0
+  if( N == 0 )
+    {
+    return NULL;
+    }
+  // Subsample by 1 = do nothing
+  if( N == 1 )
+    {
+    return newTube;
+    }
+
+  int count = 0;
+  for( pointItr = beginItr; pointItr != endItr; ++pointItr )
+    {
+    typename TTube::TubePointType newPoint = *pointItr;
+
+    // An offset of N/2 on each side of the tube is chosen to
+    // delete the end and the beginning of it,
+    // which usually aren't very good.
+    if( ( count - N/2 ) % N == 0 )
+      {
+      newPointList.push_back( newPoint );
+      }
+
+    ++count;
+    }
+
+  newTube->SetPoints( newPointList );
+  tube::ComputeTubeTangentsAndNormals< TTube >( newTube );
+
+  return newTube;
+}
+
+/**
+ * Compute tube length */
+template< class TTube >
+double
+ComputeTubeLength( const typename TTube::Pointer & tube )
+{
+  if( tube->GetNumberOfPoints() <= 1 )
+    return 0;
+
+  typedef typename TTube::PointListType     TubePointListType;
+  typedef typename TTube::PointType         PositionType;
+  typedef typename PositionType::VectorType PositionVectorType;
+
+  TubePointListType tubePointsList = tube->GetPoints();
+
+  typename TubePointListType::const_iterator itTubePoints =
+    tubePointsList.begin();
+
+  PositionVectorType ptPrevPosVec =
+    itTubePoints->GetPosition().GetVectorFromOrigin();
+
+  ++itTubePoints;
+
+  double tubeLength = 0;
+  while( itTubePoints != tubePointsList.end() )
+    {
+    PositionVectorType ptCurPosVec =
+      itTubePoints->GetPosition().GetVectorFromOrigin();
+
+    tubeLength += (ptCurPosVec - ptPrevPosVec).GetNorm();
+
+    ptPrevPosVec = ptCurPosVec;
+    ++itTubePoints;
+    }
+
+  return tubeLength;
 }
 
 } // End namespace tube

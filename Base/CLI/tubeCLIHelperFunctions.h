@@ -67,13 +67,13 @@ int ParseArgsAndCallDoIt( const std::string & inputImage, int argc,
 
   IOComponentType componentType = ImageIOType::UNKNOWNCOMPONENTTYPE;
   unsigned int dimension = 0;
-
   try
     {
     GetImageInformation( inputImage, componentType, dimension );
 
 #ifndef PARSE_ARGS_FLOAT_ONLY
 
+#ifdef SUPPORT_2D_IMAGES
     if( dimension == 2 )
       {
       switch( componentType )
@@ -86,16 +86,23 @@ int ParseArgsAndCallDoIt( const std::string & inputImage, int argc,
           return DoIt< unsigned short, 2 >( argc, argv );
         case ImageIOType::SHORT:
           return DoIt< short, 2 >( argc, argv );
+#ifndef PARSE_ARGS_INT_ONLY
         case ImageIOType::FLOAT:
           return DoIt< float, 2 >( argc, argv );
         case ImageIOType::DOUBLE:
           return DoIt< double, 2 >( argc, argv );
+#endif
+        case ImageIOType::INT:
+          return DoIt< int, 2 >( argc, argv );
+        case ImageIOType::UINT:
+          return DoIt< unsigned int, 2 >( argc, argv );
         case ImageIOType::UNKNOWNCOMPONENTTYPE:
         default:
           tubeErrorMacro( << "Unknown component type." );
           return EXIT_FAILURE;
         }
       }
+#endif
 
     if( dimension == 3 )
       {
@@ -109,10 +116,16 @@ int ParseArgsAndCallDoIt( const std::string & inputImage, int argc,
           return DoIt < unsigned short, 3 >( argc, argv );
         case ImageIOType::SHORT:
           return DoIt< short, 3 >( argc, argv );
+#ifndef PARSE_ARGS_INT_ONLY
         case ImageIOType::FLOAT:
           return DoIt < float, 3 >( argc, argv );
         case ImageIOType::DOUBLE:
           return DoIt < double, 3 >( argc, argv );
+#endif
+        case ImageIOType::INT:
+          return DoIt< int, 3 >( argc, argv );
+        case ImageIOType::UINT:
+          return DoIt< unsigned int, 3 >( argc, argv );
         case ImageIOType::UNKNOWNCOMPONENTTYPE:
         default:
           tubeErrorMacro( << "Unknown component type." );
@@ -121,12 +134,12 @@ int ParseArgsAndCallDoIt( const std::string & inputImage, int argc,
       }
 
 #else
-
+#ifdef SUPPORT_2D_IMAGES
     if( dimension == 2 )
       {
       return DoIt< float, 2 >( argc, argv );
       }
-
+#endif
     if( dimension == 3 )
       {
       return DoIt< float, 3 >( argc, argv );
@@ -134,7 +147,7 @@ int ParseArgsAndCallDoIt( const std::string & inputImage, int argc,
 
 #endif // End !defined(PARSE_ARGS_FLOAT_ONLY)
 
-    tubeErrorMacro( << "Unknown dimension." );
+    tubeErrorMacro( << "Dimension size of " << dimension << " not supported" );
     return EXIT_FAILURE;
     }
   catch( itk::ExceptionObject & ex )

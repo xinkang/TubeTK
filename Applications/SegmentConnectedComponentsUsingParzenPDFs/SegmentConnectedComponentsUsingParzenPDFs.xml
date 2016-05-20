@@ -21,6 +21,26 @@
       <default/>
     </image>
     <image>
+      <name>labelmap</name>
+      <label>Label Map</label>
+      <channel>input</channel>
+      <index>1</index>
+      <description>Label map that designates the object of interest and "other."</description>
+      <default/>
+    </image>
+    <image>
+      <name>outputVolume</name>
+      <label>Output Volume</label>
+      <channel>output</channel>
+      <index>2</index>
+      <description>Segmentation results.</description>
+      <default/>
+    </image>
+  </parameters>
+  <parameters advanced="true">
+    <label>IO Options</label>
+    <description>Input/output parameters.</description>
+    <image>
       <name>inputVolume2</name>
       <label>Input Volume 2</label>
       <longflag>inputVolume2</longflag>
@@ -49,7 +69,7 @@
       <label>Object ID</label>
       <longflag>objectId</longflag>
       <description>List of values that represent the objects in the label map.</description>
-      <default>255</default>
+      <default>255,127</default>
     </integer-vector>
     <integer>
       <name>voidId</name>
@@ -58,22 +78,6 @@
       <description>Value that represents "nothing" in the label map.</description>
       <default>0</default>
     </integer>
-    <image>
-      <name>labelmap</name>
-      <label>Label Map</label>
-      <channel>input</channel>
-      <index>3</index>
-      <description>Label map that designates the object of interest and "other."</description>
-      <default/>
-    </image>
-    <image>
-      <name>outputVolume</name>
-      <label>Output Volume</label>
-      <channel>output</channel>
-      <index>4</index>
-      <description>Segmentation results.</description>
-      <default/>
-    </image>
   </parameters>
   <parameters advanced="true">
     <label>PDF Parameters</label>
@@ -92,6 +96,13 @@
       <default>1</default>
       <longflag>holeFillIterations</longflag>
     </integer>
+    <boolean>
+      <name>dilateFirst</name>
+      <label>Dilate first</label>
+      <description>Performs dilation then erosion (versus opposite order) to help fill-in sparse models.</description>
+      <default>false</default>
+      <longflag>dilateFirst</longflag>
+    </boolean>
     <double-vector>
       <name>objectPDFWeight</name>
       <label>PDF Weight</label>
@@ -100,19 +111,19 @@
       <longflag>objectPDFWeight</longflag>
     </double-vector>
     <double>
-      <name>probSmoothingStdDev</name>
-      <label>Probability Smoothing Standard Deviation</label>
+      <name>probImageSmoothingStdDev</name>
+      <label>Probability Image, Smoothing Standard Deviation</label>
       <description>Standard deviation of blur applied to probability images prior to computing maximum likelihood of each class at each pixel</description>
-      <default>3.0</default>
-      <longflag>probSmoothingStdDev</longflag>
+      <default>1.0</default>
+      <longflag>probImageSmoothingStdDev</longflag>
     </double>
-    <boolean>
-      <name>draft</name>
-      <label>Draft Mode</label>
-      <description>Generate draft results.</description>
-      <longflag>draft</longflag>
-      <default>false</default>
-    </boolean>
+    <double>
+      <name>histogramSmoothingStdDev</name>
+      <label>Histogram Smoothing Standard Deviation</label>
+      <description>Standard deviation of blur applied to convert the histogram to a probability density function estimate</description>
+      <default>5.0</default>
+      <longflag>histogramSmoothingStdDev</longflag>
+    </double>
     <boolean>
       <name>reclassifyObjectLabels</name>
       <label>Reclassify Object Labels</label>

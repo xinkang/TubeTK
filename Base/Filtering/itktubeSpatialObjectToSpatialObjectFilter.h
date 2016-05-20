@@ -33,8 +33,8 @@ namespace tube
 {
 /** \class SpatialObjectToSpatialObjectFilter
  *
- * \brief Base class for filters that take a SpatialObject as input and produce
- * a SpatialObject as output.
+ * \brief Base class for filters that take a SpatialObject as input
+ * and produce a SpatialObject as output.
  */
 template< class TInputSpatialObject, class TOutputSpatialObject >
 class SpatialObjectToSpatialObjectFilter
@@ -53,11 +53,15 @@ public:
   typedef TInputSpatialObject  InputSpatialObjectType;
   typedef TOutputSpatialObject OutputSpatialObjectType;
 
-  using Superclass::SetInput;
   virtual void SetInput( const InputSpatialObjectType * spatialObject );
 
-  virtual void SetInput( unsigned int,
-    const InputSpatialObjectType * spatialObject );
+  virtual void SetInput( unsigned int, const InputSpatialObjectType *
+    spatialObject );
+
+  // from itkProcessObject
+  virtual void SetInput(const
+    itk::ProcessObject::DataObjectIdentifierType & index, itk::DataObject *
+    input );
 
   const InputSpatialObjectType * GetInput( void ) const;
 
@@ -68,8 +72,12 @@ protected:
   virtual ~SpatialObjectToSpatialObjectFilter( void ) {}
 
 private:
-  SpatialObjectToSpatialObjectFilter( const Self & ); // purposely not implemented
-  void operator=( const Self & );                     // purposely not implemented
+  // purposely not implemented
+  SpatialObjectToSpatialObjectFilter( const Self & );
+
+  // purposely not implemented
+  void operator=( const Self & );
+
 }; // End class SpatialObjectToSpatialObjectFilter
 
 } // End namespace tube

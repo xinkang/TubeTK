@@ -34,7 +34,6 @@ limitations under the License.
 #include <itkImageFileWriter.h>
 #include <itkImageRegionConstIteratorWithIndex.h>
 #include <itkImageRegionIteratorWithIndex.h>
-#include <itkTimeProbesCollectorBase.h>
 
 #include <limits>
 #include <iostream>
@@ -51,14 +50,16 @@ FeatureVectorGenerator< TImage >
 {
   m_InputImageList.clear();
 
-  m_WhitenFeatureImageMean.clear();
-  m_WhitenFeatureImageStdDev.clear();
+  m_UpdateWhitenStatisticsOnUpdate = false;
+  m_WhitenMean.clear();
+  m_WhitenStdDev.clear();
 }
 
 template< class TImage >
 FeatureVectorGenerator< TImage >
 ::~FeatureVectorGenerator( void )
 {
+  m_InputImageList.clear();
 }
 
 template< class TImage >
@@ -66,9 +67,11 @@ void
 FeatureVectorGenerator< TImage >
 ::SetInput( typename ImageType::Pointer img )
 {
+  m_WhitenMean.clear();
+  m_WhitenMean.push_back( 0 );
+  m_WhitenStdDev.clear();
+  m_WhitenStdDev.push_back( 1 );
   m_InputImageList.clear();
-  m_WhitenFeatureImageMean.clear();
-  m_WhitenFeatureImageStdDev.clear();
   m_InputImageList.push_back( img );
 }
 
@@ -78,6 +81,16 @@ FeatureVectorGenerator< TImage >
 ::AddInput( typename ImageType::Pointer img )
 {
   m_InputImageList.push_back( img );
+  m_WhitenMean.push_back(0);
+  m_WhitenStdDev.push_back(1);
+}
+
+template< class TImage >
+typename FeatureVectorGenerator< TImage >::ImageType::Pointer
+FeatureVectorGenerator< TImage >
+::GetInput( unsigned int imageNum )
+{
+  return m_InputImageList[ imageNum ];
 }
 
 template< class TImage >
@@ -91,70 +104,17 @@ FeatureVectorGenerator< TImage >
 template< class TImage >
 void
 FeatureVectorGenerator< TImage >
-::UpdateWhitenFeatureImageStats( void )
+::SetUpdateWhitenStatisticsOnUpdate( bool updateOnUpdate )
 {
-  const unsigned int numFeatures = this->GetNumberOfFeatures();
+  m_UpdateWhitenStatisticsOnUpdate = updateOnUpdate;
+}
 
-  m_WhitenFeatureImageMean.resize( numFeatures );
-  m_WhitenFeatureImageStdDev.resize( numFeatures );
-  ValueListType imVal;
-  imVal.resize( numFeatures );
-  ValueListType delta;
-  delta.resize( numFeatures );
-  ValueListType imMean;
-  imMean.resize( numFeatures );
-  ValueListType imStdDev;
-  imStdDev.resize( numFeatures );
-  for( unsigned int i = 0; i < numFeatures; i++ )
-    {
-    m_WhitenFeatureImageMean[i] = 0;
-    m_WhitenFeatureImageStdDev[i] = 1;
-    imVal[i] = 0;
-    delta[i] = 0;
-    imMean[i] = 0;
-    imStdDev[i] = 0;
-    }
-  unsigned int imCount = 0;
-
-  typedef itk::ImageRegionIteratorWithIndex< TImage >
-    ImageIteratorType;
-  ImageIteratorType itIm( m_InputImageList[0],
-    m_InputImageList[0]->GetLargestPossibleRegion() );
-
-  IndexType indx;
-  while( !itIm.IsAtEnd() )
-    {
-    indx = itIm.GetIndex();
-    imVal = this->GetFeatureVector( indx );
-    ++imCount;
-    for( unsigned int i = 0; i < numFeatures; i++ )
-      {
-      delta[i] = imVal[i] - imMean[i];
-      imMean[i] += delta[i] / imCount;
-      imStdDev[i] += delta[i] * ( imVal[i] - imMean[i] );
-      }
-    ++itIm;
-    }
-  if( imCount > 1 )
-    {
-    for( unsigned int i = 0; i < numFeatures; i++ )
-      {
-      imStdDev[i] = vcl_sqrt( imStdDev[i] / ( imCount - 1 ) );
-      }
-    }
-  else
-    {
-    for( unsigned int i = 0; i < numFeatures; i++ )
-      {
-      imStdDev[i] = 0;
-      }
-    }
-
-  for( unsigned int i = 0; i < numFeatures; i++ )
-    {
-    m_WhitenFeatureImageMean[i] = imMean[i];
-    m_WhitenFeatureImageStdDev[i] = imStdDev[i];
-    }
+template< class TImage >
+bool
+FeatureVectorGenerator< TImage >
+::GetUpdateWhitenStatisticsOnUpdate( void )
+{
+  return m_UpdateWhitenStatisticsOnUpdate;
 }
 
 
@@ -163,7 +123,7 @@ void
 FeatureVectorGenerator< TImage >
 ::SetWhitenMeans( const ValueListType & means )
 {
-  m_WhitenFeatureImageMean = means;
+  m_WhitenMean = means;
 }
 
 template< class TImage >
@@ -171,7 +131,7 @@ const typename FeatureVectorGenerator< TImage >::ValueListType &
 FeatureVectorGenerator< TImage >
 ::GetWhitenMeans( void ) const
 {
-  return m_WhitenFeatureImageMean;
+  return m_WhitenMean;
 }
 
 template< class TImage >
@@ -179,7 +139,7 @@ void
 FeatureVectorGenerator< TImage >
 ::SetWhitenStdDevs( const ValueListType & stdDevs )
 {
-  m_WhitenFeatureImageStdDev = stdDevs;
+  m_WhitenStdDev = stdDevs;
 }
 
 template< class TImage >
@@ -187,28 +147,28 @@ const typename FeatureVectorGenerator< TImage >::ValueListType &
 FeatureVectorGenerator< TImage >
 ::GetWhitenStdDevs( void ) const
 {
-  return m_WhitenFeatureImageStdDev;
+  return m_WhitenStdDev;
 }
 
 template< class TImage >
 void
 FeatureVectorGenerator< TImage >
-::SetWhitenFeatureImageMean( unsigned int num, double mean )
+::SetWhitenMean( unsigned int num, double mean )
 {
-  if( num < m_WhitenFeatureImageMean.size() )
+  if( num < m_WhitenMean.size() )
     {
-    m_WhitenFeatureImageMean[num] = mean;
+    m_WhitenMean[num] = mean;
     }
 }
 
 template< class TImage >
 double
 FeatureVectorGenerator< TImage >
-::GetWhitenFeatureImageMean( unsigned int num ) const
+::GetWhitenMean( unsigned int num ) const
 {
-  if( num < m_WhitenFeatureImageMean.size() )
+  if( num < m_WhitenMean.size() )
     {
-    return m_WhitenFeatureImageMean[num];
+    return m_WhitenMean[num];
     }
   else
     {
@@ -219,22 +179,22 @@ FeatureVectorGenerator< TImage >
 template< class TImage >
 void
 FeatureVectorGenerator< TImage >
-::SetWhitenFeatureImageStdDev( unsigned int num, double stdDev )
+::SetWhitenStdDev( unsigned int num, double stdDev )
 {
-  if( num < m_WhitenFeatureImageStdDev.size() )
+  if( num < m_WhitenStdDev.size() )
     {
-    m_WhitenFeatureImageStdDev[num] = stdDev;
+    m_WhitenStdDev[num] = stdDev;
     }
 }
 
 template< class TImage >
 double
 FeatureVectorGenerator< TImage >
-::GetWhitenFeatureImageStdDev( unsigned int num ) const
+::GetWhitenStdDev( unsigned int num ) const
 {
-  if( num < m_WhitenFeatureImageStdDev.size() )
+  if( num < m_WhitenStdDev.size() )
     {
-    return m_WhitenFeatureImageStdDev[num];
+    return m_WhitenStdDev[num];
     }
 
   return 1;
@@ -271,13 +231,13 @@ typename FeatureVectorGenerator< TImage >::FeatureValueType
 FeatureVectorGenerator< TImage >
 ::GetFeatureVectorValue( const IndexType & indx, unsigned int fNum ) const
 {
-  if( m_WhitenFeatureImageStdDev.size() > 0 &&
-    m_WhitenFeatureImageStdDev[fNum] > 0 )
+  if( m_WhitenStdDev.size() > 0 &&
+    m_WhitenStdDev[fNum] > 0 )
     {
     return static_cast< FeatureValueType >(
         ( m_InputImageList[fNum]->GetPixel( indx )
-          - m_WhitenFeatureImageMean[fNum] )
-        / m_WhitenFeatureImageStdDev[fNum] );
+          - m_WhitenMean[fNum] )
+        / m_WhitenStdDev[fNum] );
     }
   else
     {
@@ -294,10 +254,6 @@ FeatureVectorGenerator< TImage >
   const unsigned int numFeatures = this->GetNumberOfFeatures();
   if( featureNum < numFeatures )
     {
-    itk::TimeProbesCollectorBase timeCollector;
-
-    timeCollector.Start( "GenerateFeatureImage" );
-
     typedef itk::ImageRegionIteratorWithIndex< FeatureImageType >
       ImageIteratorType;
 
@@ -325,17 +281,94 @@ FeatureVectorGenerator< TImage >
       ++itFeatureIm;
       }
 
-    timeCollector.Stop( "GenerateFeatureImage" );
-    timeCollector.Report();
-
     return fi;
     }
   else
     {
-    return NULL;
+    throw itk::ExceptionObject( "Feature does not exist." );
     }
 }
 
+
+template< class TImage >
+void
+FeatureVectorGenerator< TImage >::
+Update( void )
+{
+  if( m_UpdateWhitenStatisticsOnUpdate )
+    {
+    this->UpdateWhitenStatistics();
+    }
+}
+
+template< class TImage >
+void
+FeatureVectorGenerator< TImage >::
+UpdateWhitenStatistics( void )
+{
+  const unsigned int numFeatures = this->GetNumberOfFeatures();
+
+  m_WhitenMean.resize( numFeatures );
+  m_WhitenStdDev.resize( numFeatures );
+  ValueListType delta;
+  delta.resize( numFeatures );
+  ValueListType imMean;
+  imMean.resize( numFeatures );
+  ValueListType imStdDev;
+  imStdDev.resize( numFeatures );
+  for( unsigned int i = 0; i < numFeatures; i++ )
+    {
+    m_WhitenMean[i] = 0;
+    m_WhitenStdDev[i] = 1;
+    delta[i] = 0;
+    imMean[i] = 0;
+    imStdDev[i] = 0;
+    }
+  unsigned int imCount = 0;
+
+  typedef itk::ImageRegionIteratorWithIndex< TImage >
+    ImageIteratorType;
+  ImageIteratorType itIm( m_InputImageList[0],
+    m_InputImageList[0]->GetLargestPossibleRegion() );
+
+  IndexType indx;
+  double imVal;
+  FeatureVectorType fv;
+  while( !itIm.IsAtEnd() )
+    {
+    indx = itIm.GetIndex();
+    fv = this->GetFeatureVector( indx );
+    ++imCount;
+    for( unsigned int i = 0; i < numFeatures; i++ )
+      {
+      imVal = fv[i];
+      delta[i] = imVal - imMean[i];
+      imMean[i] += delta[i] / imCount;
+      imStdDev[i] += delta[i] * ( imVal - imMean[i] );
+      }
+    ++itIm;
+    }
+  if( imCount > 1 )
+    {
+    for( unsigned int i = 0; i < numFeatures; i++ )
+      {
+      imStdDev[i] = std::sqrt( imStdDev[i] / ( imCount - 1 ) );
+      }
+    }
+  else
+    {
+    for( unsigned int i = 0; i < numFeatures; i++ )
+      {
+      imStdDev[i] = 1;
+      }
+    }
+
+  for( unsigned int i = 0; i < numFeatures; i++ )
+    {
+    m_WhitenMean[i] = imMean[i];
+    m_WhitenStdDev[i] = imStdDev[i];
+    }
+}
 
 template< class TImage >
 void

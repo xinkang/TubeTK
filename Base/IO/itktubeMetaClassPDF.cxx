@@ -89,9 +89,12 @@ MetaClassPDF(
 }
 
 MetaClassPDF::
-MetaClassPDF( unsigned int _x, unsigned int _y,
-  double _binMinX, double _binMinY,
-  double _binSizeX, double _binSizeY,
+MetaClassPDF( unsigned int _x,
+  unsigned int _y,
+  double _binMinX,
+  double _binMinY,
+  double _binSizeX,
+  double _binSizeY,
   float * _elementData )
 {
   VectorUIntType nBinsPerFeature;
@@ -116,9 +119,15 @@ MetaClassPDF( unsigned int _x, unsigned int _y,
 
 
 MetaClassPDF::
-MetaClassPDF( unsigned int _x, unsigned int _y, unsigned int _z,
-  double _binMinX, double _binMinY, double _binMinZ,
-  double _binSizeX, double _binSizeY, double _binSizeZ,
+MetaClassPDF( unsigned int _x,
+  unsigned int _y,
+  unsigned int _z,
+  double _binMinX,
+  double _binMinY,
+  double _binMinZ,
+  double _binSizeX,
+  double _binSizeY,
+  double _binSizeZ,
   float * _elementData )
 {
   VectorUIntType nBinsPerFeature;
@@ -362,6 +371,8 @@ InitializeEssential( unsigned int _nFeatures,
   MetaImage::InitializeEssential( _nFeatures, nBins, binSize,
     MET_FLOAT, 1, (void *)_elementData, true );
   MetaImage::Origin( minD );
+
+  MetaImage::CompressedData( true );
 
   return true;
 }
@@ -916,7 +927,7 @@ M_Read( void )
       }
     }
 
-  unsigned int nFeatures = static_cast< unsigned int >( 
+  unsigned int nFeatures = static_cast< unsigned int >(
     MetaImage::NDims() );
 
   m_BinMin.resize( nFeatures );

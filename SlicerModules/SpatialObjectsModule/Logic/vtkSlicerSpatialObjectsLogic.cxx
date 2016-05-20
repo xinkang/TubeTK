@@ -41,7 +41,6 @@ limitations under the License.
 #include <itksys/Directory.hxx>
 #include <itksys/SystemTools.hxx>
 
-vtkCxxRevisionMacro(vtkSlicerSpatialObjectsLogic, "$Revision: 1.9.12.1 $");
 vtkStandardNewMacro(vtkSlicerSpatialObjectsLogic);
 
 //------------------------------------------------------------------------------
@@ -117,83 +116,115 @@ AddSpatialObjects(const char* dirname, std::vector<std::string> suffix)
 }
 
 //------------------------------------------------------------------------------
-vtkMRMLSpatialObjectsNode*
-vtkSlicerSpatialObjectsLogic::AddSpatialObject(const char* filename)
+void vtkSlicerSpatialObjectsLogic
+::SetSpatialObject(vtkMRMLSpatialObjectsNode* spatialObjectNode,
+                   const char* filename)
 {
-  vtkDebugMacro("Adding spatial objects from filename " << filename);
-
-  vtkNew<vtkMRMLSpatialObjectsNode> spatialObjectsNode;
-  vtkNew<vtkMRMLSpatialObjectsStorageNode> storageNode;
-  vtkNew<vtkMRMLSpatialObjectsLineDisplayNode> displayLineNode;
-  vtkNew<vtkMRMLSpatialObjectsTubeDisplayNode> displayTubeNode;
-  vtkNew<vtkMRMLSpatialObjectsGlyphDisplayNode> displayGlyphNode;
-
-  vtkNew<vtkMRMLSpatialObjectsDisplayPropertiesNode> lineProperties;
-  vtkNew<vtkMRMLSpatialObjectsDisplayPropertiesNode> tubeProperties;
-  vtkNew<vtkMRMLSpatialObjectsDisplayPropertiesNode> glyphProperties;
-  glyphProperties->SetGlyphGeometry(
-    vtkMRMLSpatialObjectsDisplayPropertiesNode::Lines);
-
-  storageNode->SetFileName(filename);
-  if(storageNode->ReadData(spatialObjectsNode.GetPointer()) != 0)
+  if (!spatialObjectNode)
     {
-    const itksys_stl::string fname(filename);
-    itksys_stl::string name =
-      itksys::SystemTools::GetFilenameWithoutExtension(fname);
-    std::string uname(
-      this->GetMRMLScene()->GetUniqueNameByString(name.c_str()));
-    spatialObjectsNode->SetName(uname.c_str());
+    return;
+    }
 
-    spatialObjectsNode->SetScene(this->GetMRMLScene());
-    storageNode->SetScene(this->GetMRMLScene());
-    displayLineNode->SetScene(this->GetMRMLScene());
-    displayTubeNode->SetScene(this->GetMRMLScene());
-    displayGlyphNode->SetScene(this->GetMRMLScene());
+  vtkMRMLSpatialObjectsStorageNode* storageNode =
+    vtkMRMLSpatialObjectsStorageNode::SafeDownCast(
+      spatialObjectNode->GetStorageNode());
+  bool addStorageNodeToScene = false;
+  if (!storageNode)
+    {
+    addStorageNodeToScene = true;
+    storageNode = vtkMRMLSpatialObjectsStorageNode::New();
+    }
+  if (filename)
+    {
+    storageNode->SetFileName(filename);
 
-    displayLineNode->SetVisibility(1);
-    displayTubeNode->SetVisibility(0);
-    displayGlyphNode->SetVisibility(0);
-
-    this->GetMRMLScene()->SaveStateForUndo();
-    this->GetMRMLScene()->AddNode(lineProperties.GetPointer());
-    this->GetMRMLScene()->AddNode(tubeProperties.GetPointer());
-    this->GetMRMLScene()->AddNode(glyphProperties.GetPointer());
-
-    displayLineNode->
-      SetAndObserveSpatialObjectsDisplayPropertiesNodeID(
-        lineProperties->GetID());
-    displayTubeNode->
-      SetAndObserveSpatialObjectsDisplayPropertiesNodeID(
-        tubeProperties->GetID());
-    displayGlyphNode->
-      SetAndObserveSpatialObjectsDisplayPropertiesNodeID(
-        glyphProperties->GetID());
-
-    this->GetMRMLScene()->AddNode(storageNode.GetPointer());
-    this->GetMRMLScene()->AddNode(displayLineNode.GetPointer());
-    this->GetMRMLScene()->AddNode(displayTubeNode.GetPointer());
-    this->GetMRMLScene()->AddNode(displayGlyphNode.GetPointer());
-
-    spatialObjectsNode->SetAndObserveStorageNodeID(storageNode->GetID());
-    displayLineNode->SetAndObserveColorNodeID("vtkMRMLColorTableNodeRainbow");
-    displayTubeNode->SetAndObserveColorNodeID("vtkMRMLColorTableNodeRainbow");
-    displayGlyphNode->SetAndObserveColorNodeID("vtkMRMLColorTableNodeRainbow");
-
-    spatialObjectsNode->SetAndObserveDisplayNodeID(displayLineNode->GetID());
-    spatialObjectsNode->AddAndObserveDisplayNodeID(displayTubeNode->GetID());
-    spatialObjectsNode->AddAndObserveDisplayNodeID(displayGlyphNode->GetID());
-
-    this->GetMRMLScene()->AddNode(spatialObjectsNode.GetPointer());
-    this->Modified();
+    if(storageNode->ReadData(spatialObjectNode) != 0)
+      {
+      const std::string fname(filename);
+      std::string name =
+        itksys::SystemTools::GetFilenameWithoutExtension(fname);
+      std::string uname(
+        this->GetMRMLScene()->GetUniqueNameByString(name.c_str()));
+      spatialObjectNode->SetName(uname.c_str());
+      }
     }
   else
     {
-    vtkErrorMacro("Couldn't read file, returning null SpatialObjectsNode: "
-                  << filename);
-    return 0;
+    spatialObjectNode->Reset();
     }
 
+  this->GetMRMLScene()->SaveStateForUndo();
+  if (storageNode && addStorageNodeToScene)
+    {
+    this->GetMRMLScene()->AddNode(storageNode);
+    storageNode->Delete();
+    }
+  this->Modified();
+}
+
+//------------------------------------------------------------------------------
+vtkMRMLSpatialObjectsNode*
+vtkSlicerSpatialObjectsLogic::AddSpatialObject(const char* filename)
+{
+  vtkDebugMacro("Adding spatial objects from filename ");
+
+  vtkNew<vtkMRMLSpatialObjectsNode> spatialObjectsNode;
+  this->SetSpatialObject(spatialObjectsNode.GetPointer(), filename);
+
+  this->GetMRMLScene()->SaveStateForUndo();
+  this->GetMRMLScene()->AddNode(spatialObjectsNode.GetPointer());
+  this->AddDisplayNodes(spatialObjectsNode.GetPointer());
+  this->Modified();
+
   return spatialObjectsNode.GetPointer();
+}
+
+
+//------------------------------------------------------------------------------
+vtkMRMLSpatialObjectsNode*
+vtkSlicerSpatialObjectsLogic::MergeSpatialObjectFromFilename(
+  vtkMRMLSpatialObjectsNode* recipient, const char* filename)
+{
+  if (!filename)
+    {
+    return recipient;
+    }
+
+  vtkNew<vtkMRMLSpatialObjectsNode> donor;
+  vtkNew<vtkMRMLSpatialObjectsStorageNode> donorReader;
+  donorReader->SetFileName(filename);
+  donorReader->ReadData(donor.GetPointer());
+  this->SetSpatialObject(donor.GetPointer(), filename);
+
+  this->MergeSpatialObject(recipient, donor.GetPointer());
+  return recipient;
+}
+
+//------------------------------------------------------------------------------
+vtkMRMLSpatialObjectsNode*
+vtkSlicerSpatialObjectsLogic::MergeSpatialObject(
+  vtkMRMLSpatialObjectsNode* recipient, vtkMRMLSpatialObjectsNode* donor)
+{
+  if (!recipient || !donor)
+    {
+    return recipient;
+    }
+
+  recipient->GetSpatialObject()->AddSpatialObject(donor->GetSpatialObject());
+  recipient->UpdatePolyDataFromSpatialObject();
+  return recipient;
+}
+
+//------------------------------------------------------------------------------
+void vtkSlicerSpatialObjectsLogic::
+AddDisplayNodes(vtkMRMLSpatialObjectsNode* spatialObjectsNode)
+{
+  if (!spatialObjectsNode)
+    {
+    return;
+    }
+
+  spatialObjectsNode->CreateDefaultDisplayNodes();
 }
 
 //------------------------------------------------------------------------------
@@ -225,6 +256,17 @@ SaveSpatialObject(const char* filename,
   storageNode->SetFileName(filename);
 
   return storageNode->WriteData(spatialObjectsNode);
+}
+
+//------------------------------------------------------------------------------
+void vtkSlicerSpatialObjectsLogic
+::CopySpatialObject(vtkMRMLSpatialObjectsNode* from,
+                    vtkMRMLSpatialObjectsNode* to)
+{
+  if (from && to)
+    {
+    to->SetSpatialObject(from->GetSpatialObject());
+    }
 }
 
 //------------------------------------------------------------------------------

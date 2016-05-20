@@ -24,12 +24,17 @@ limitations under the License.
 #include "tubeBaseFilteringTestsCLP.h"
 #include "tubeTestMain.h"
 
+#include "tubetkConfigure.h"
+
 #include <iostream>
 
 void RegisterTests( void )
 {
   REGISTER_TEST( tubeBaseFilteringPrintTest );
+  REGISTER_TEST( itktubeCVTImageFilterTest );
   REGISTER_TEST( itktubeExtractTubePointsSpatialObjectFilterTest );
+  REGISTER_TEST( itktubeFFTGaussianDerivativeIFFTFilterTest );
+  REGISTER_TEST( itktubeRidgeFFTFilterTest );
   REGISTER_TEST( itktubeSubSampleTubeSpatialObjectFilterTest );
   REGISTER_TEST( itktubeSubSampleTubeTreeSpatialObjectFilterTest );
   REGISTER_TEST( itktubeStructureTensorRecursiveGaussianImageFilterTest );
@@ -37,8 +42,13 @@ void RegisterTests( void )
   REGISTER_TEST( itktubeTubeEnhancingDiffusion2DImageFilterTest );
   REGISTER_TEST( itktubeSheetnessMeasureImageFilterTest );
   REGISTER_TEST( itktubeSheetnessMeasureImageFilterTest2 );
-  REGISTER_TEST( itktubeShrinkUsingMaxImageFilterTest );
+  REGISTER_TEST( itktubeShrinkWithBlendingImageFilterTest );
   REGISTER_TEST( itktubeAnisotropicHybridDiffusionImageFilterTest );
   REGISTER_TEST( itktubeAnisotropicCoherenceEnhancingDiffusionImageFilterTest );
   REGISTER_TEST( itktubeAnisotropicEdgeEnhancementDiffusionImageFilterTest );
+  REGISTER_TEST( itktubeTortuositySpatialObjectFilterTest );
+
+  #if defined( TubeTK_USE_GPU_ARRAYFIRE )
+    REGISTER_TEST( itktubeGPUArrayFireGaussianDerivativeFilterTest );
+  #endif
 }

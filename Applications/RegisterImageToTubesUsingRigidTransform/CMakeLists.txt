@@ -23,8 +23,7 @@
 
 set( MODULE_NAME RegisterImageToTubesUsingRigidTransform )
 project( ${MODULE_NAME} )
-# To silence the warning about getting LOCATION (Tuner only targets non-VS for
-# now)
+
 if( NOT ${CMAKE_VERSION} VERSION_LESS 3.0 )
   cmake_policy(SET CMP0026 OLD)
 endif( NOT ${CMAKE_VERSION} VERSION_LESS 3.0 )
@@ -34,46 +33,22 @@ if( NOT TubeTK_SOURCE_DIR )
   include( ${TubeTK_USE_FILE} )
 endif( NOT TubeTK_SOURCE_DIR )
 
-find_package( ParameterSerializer REQUIRED )
-include_directories( ${ParameterSerializer_INCLUDE_DIRS} )
+find_package( ITK REQUIRED )
+if( TubeTK_BUILD_WITHIN_SLICER )
+  set( ITK_NO_IO_FACTORY_REGISTER_MANAGER 1 )
+endif( TubeTK_BUILD_WITHIN_SLICER )
+include( ${ITK_USE_FILE} )
 
 find_package( SlicerExecutionModel REQUIRED )
 include( ${SlicerExecutionModel_USE_FILE} )
-if( SlicerExecutionModel_USE_SERIALIZER )
-  add_definitions( -DSlicerExecutionModel_USE_SERIALIZER )
-endif()
-
-find_package( ITK REQUIRED )
-include( ${ITK_USE_FILE} )
-
-set(tubetk_base_includes
-  ${TubeTK_SOURCE_DIR}/Base/CLI
-  ${TubeTK_SOURCE_DIR}/Base/Common
-  ${TubeTK_SOURCE_DIR}/Base/Filtering
-  ${TubeTK_SOURCE_DIR}/Base/Numerics
-  ${TubeTK_SOURCE_DIR}/Base/ParameterSerializer/Filtering
-  ${TubeTK_SOURCE_DIR}/Base/ParameterSerializer/Registration
-  ${TubeTK_SOURCE_DIR}/Base/ParameterSerializer/USTK
-  ${TubeTK_SOURCE_DIR}/Base/Registration
-  ${TubeTK_SOURCE_DIR}/Base/USTK )
 
 SEMMacroBuildCLI(
   NAME ${MODULE_NAME}
   LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
-  TARGET_LIBRARIES ${ITK_LIBRARIES} ${ParameterSerializer_LIBRARIES}
-  INCLUDE_DIRECTORIES ${tubetk_base_includes} )
-
-SEMMacroBuildCLI(
-  NAME ComputeImageToTubeRigidMetricImage
-  LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
-  TARGET_LIBRARIES ${ITK_LIBRARIES} ${ParameterSerializer_LIBRARIES}
-  INCLUDE_DIRECTORIES ${tubetk_base_includes} )
-
-SEMMacroBuildCLI(
-  NAME ExtractMetricImageSlice
-  LOGO_HEADER ${TubeTK_SOURCE_DIR}/Base/CLI/TubeTKLogo.h
-  TARGET_LIBRARIES ${ITK_LIBRARIES} ${ParameterSerializer_LIBRARIES}
-  INCLUDE_DIRECTORIES ${tubetk_base_includes} )
+  TARGET_LIBRARIES
+    ${ITK_LIBRARIES} ITKIOSpatialObjects ITKIOMeta
+    TubeCLI TubeTKCommon TubeTKFiltering TubeTKNumerics TubeTKRegistration
+    TubeTKUSTK )
 
 if( BUILD_TESTING )
   add_subdirectory( Testing )

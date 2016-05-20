@@ -40,6 +40,7 @@ limitations under the License.
 
 // Spatial Objects includes
 #include <vtkSlicerSpatialObjectsModuleMRMLExport.h>
+#include <vtkVersion.h>
 #include <itkGroupSpatialObject.h>
 
 class vtkMRMLSpatialObjectsDisplayNode;
@@ -54,7 +55,8 @@ class VTK_SLICER_SPATIALOBJECTS_MODULE_MRML_EXPORT vtkMRMLSpatialObjectsNode
   : public vtkMRMLModelNode
 {
 public:
-  typedef itk::GroupSpatialObject<3> TubeNetType;
+  typedef itk::GroupSpatialObject<3>  TubeNetType;
+  typedef TubeNetType::Pointer        TubeNetPointerType;
 
   static vtkMRMLSpatialObjectsNode* New( void );
   vtkTypeMacro(vtkMRMLSpatialObjectsNode, vtkMRMLModelNode);
@@ -79,31 +81,26 @@ public:
   virtual void Copy(vtkMRMLNode *node);
 
   ///
+  /// Reset the node to an empty spatial object
+  virtual void Reset();
+
+  ///
   /// Updates this node if it depends on other nodes
   /// when the node is deleted in the scene
   virtual void UpdateReferences( void );
 
   ///
-  /// Finds the storage node and read the data
-  virtual void UpdateScene(vtkMRMLScene *scene);
-
-  ///
   /// Get node XML tag name (like Volume, Model)
   virtual const char* GetNodeTagName( void )
-  {return "SpatialObjects";}
-
-  /// Get the subsampling ratio for the polydata
-  vtkGetMacro(SubsamplingRatio, float);
-
-  /// Set the subsampling ratio for the polydata
-  //
-  virtual void SetSubsamplingRatio(float);
-  virtual float GetSubsamplingRatioMinValue( void ) {return 0.;}
-  virtual float GetSubsamplingRatioMaxValue( void ) {return 1.;}
+    {return "SpatialObjects";}
 
   ///
   /// Get the subsampled PolyData converted from the real data in the node.
-  virtual vtkPolyData* GetFilteredPolyData( void );
+#if VTK_MAJOR_VERSION <= 5
+   virtual vtkPolyData* GetFilteredPolyData( void );
+#else
+  virtual vtkAlgorithmOutput* GetFilteredPolyDataConnection( void );
+#endif
 
   ///
   /// Get associated line display node or NULL if not set.
@@ -139,11 +136,32 @@ public:
 
   // Description:
   // Get/Set the SpatialObject when a new node is set
-  vtkGetMacro(SpatialObject, TubeNetType*);
-  vtkSetMacro(SpatialObject, TubeNetType*);
+  TubeNetPointerType GetSpatialObject( void );
+  void SetSpatialObject(TubeNetPointerType object);
 
   /// Set and observe poly data for this model
   virtual void SetAndObservePolyData(vtkPolyData* polyData);
+
+  // Description:
+  // Reset and recompute the polydata from the spatial object.
+  virtual void UpdatePolyDataFromSpatialObject( void );
+
+  //Description
+  //Build the colormap for the default color of the tubes of the spatial object
+  void BuildDefaultColorMap( void );
+  //Get color
+  bool GetColorFromDefaultColorMap( int TubeId, std::vector<double> &color );
+
+  //Get SelectedTubeIds
+  std::set<int> const & GetSelectedTubeIds() const
+    { return m_SelectedTubeIds; }
+
+  //Set SelectedTubeIds
+  void InsertSelectedTube( int TubeId );
+  //Clear Selected tubeIds
+  void ClearSelectedTubes();
+  //Erase a tube from selectetubeIds
+  void EraseSelectedTube( int TubeId );
 
 protected:
   vtkMRMLSpatialObjectsNode( void );
@@ -155,17 +173,21 @@ protected:
   // Contains the SpatialObject structure used to generate the differents
   // PolyData for visualization and allow keeping further informations
   // for object processing and editions.
-  TubeNetType* SpatialObject;
+  TubeNetPointerType m_SpatialObject;
 
-  vtkIdTypeArray* ShuffledIds;
+  vtkIdTypeArray* m_ShuffledIds;
 
-  virtual void PrepareSubsampling( void );
-  virtual void UpdateSubsampling( void );
-  virtual void CleanSubsampling( void );
+  virtual void PrepareCleaning( void );
+  virtual void UpdateCleaning( void );
+  virtual void RemoveCleaning( void );
 
-  vtkCleanPolyData* CleanPolyDataPostSubsampling;
-  float SubsamplingRatio;
+  vtkCleanPolyData* m_CleanPolyData;
 
+  std::set<int>                           m_SelectedTubeIds;
+  std::map< int, std::vector<double> >    m_DefaultColorMap;
+
+private:
+  void Reset( vtkMRMLNode* defaultNode ) {};
 }; // End class vtkMRMLSpatialObjectsNode
 
 #endif // End !defined(__vtkMRMLSpatialObjectsNode_h)

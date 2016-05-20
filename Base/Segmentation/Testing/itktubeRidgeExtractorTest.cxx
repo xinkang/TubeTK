@@ -28,7 +28,7 @@ limitations under the License.
 #include <itkImageRegionIteratorWithIndex.h>
 
 int itktubeRidgeExtractorTest( int argc, char * argv[] )
-  {
+{
   if( argc != 3 )
     {
     std::cout
@@ -58,35 +58,34 @@ int itktubeRidgeExtractorTest( int argc, char * argv[] )
   std::cout << "Data min = " << dataMin << std::endl;
   double dataMax = ridgeOp->GetDataMax();
   std::cout << "Data max = " << dataMax << std::endl;
-  double threshT = ridgeOp->GetThreshT();
-  std::cout << "Theta threshold = " << threshT << std::endl;
-  double threshX = ridgeOp->GetThreshX();
-  std::cout << "X threshold = " << threshX << std::endl;
-  double threshRidgeness = ridgeOp->GetThreshRidgeness();
-  std::cout << "Ridgeness threshold = " << threshRidgeness << std::endl;
-  double threshRidgenessStart = ridgeOp->GetThreshRidgenessStart();
-  std::cout << "RidgenessStart threshold = " << threshRidgenessStart
+  double maxT = ridgeOp->GetMaxTangentChange();
+  std::cout << "Tangent change threshold = " << maxT << std::endl;
+  double maxX = ridgeOp->GetMaxXChange();
+  std::cout << "X threshold = " << maxX << std::endl;
+  double minRidgeness = ridgeOp->GetMinRidgeness();
+  std::cout << "Ridgeness threshold = " << minRidgeness << std::endl;
+  double minRidgenessStart = ridgeOp->GetMinRidgenessStart();
+  std::cout << "RidgenessStart threshold = " << minRidgenessStart
     << std::endl;
-  double threshCurvature = ridgeOp->GetThreshCurvature();
-  std::cout << "Curvature threshold = " << threshCurvature << std::endl;
-  double threshCurvatureStart = ridgeOp->GetThreshCurvatureStart();
-  std::cout << "CurvatureStart threshold = " << threshCurvatureStart
+  double minCurvature = ridgeOp->GetMinCurvature();
+  std::cout << "Curvature threshold = " << minCurvature << std::endl;
+  double minCurvatureStart = ridgeOp->GetMinCurvatureStart();
+  std::cout << "CurvatureStart threshold = " << minCurvatureStart
     << std::endl;
-  double threshRoundness = ridgeOp->GetThreshRoundness();
-  std::cout << "Roundness threshold = " << threshRoundness << std::endl;
-  double threshRoundnessStart = ridgeOp->GetThreshRoundnessStart();
-  std::cout << "RoundnessStart threshold = " << threshRoundnessStart
+  double minRoundness = ridgeOp->GetMinRoundness();
+  std::cout << "Roundness threshold = " << minRoundness << std::endl;
+  double minRoundnessStart = ridgeOp->GetMinRoundnessStart();
+  std::cout << "RoundnessStart threshold = " << minRoundnessStart
     << std::endl;
   itk::Index<3> extractBoundMin = ridgeOp->GetExtractBoundMin();
   std::cout << "Extract bound min = " << extractBoundMin << std::endl;
   itk::Index<3> extractBoundMax = ridgeOp->GetExtractBoundMax();
   std::cout << "Extract bound max = " << extractBoundMax << std::endl;
 
-  ridgeOp->SetScale( 1.0 );
-  ridgeOp->SetExtent( 2.5 );
-  ridgeOp->SetDynamicScale( true );
+  ridgeOp->SetScale( 2.0 );
+  ridgeOp->SetDynamicScale( false );
 
-  double recoveryMax = ridgeOp->GetRecoveryMax();
+  double recoveryMax = ridgeOp->GetMaxRecoveryAttempts();
   std::cout << "Recovery max = " << recoveryMax << std::endl;
 
   ImageType::Pointer imOut = ImageType::New();
@@ -98,7 +97,7 @@ int itktubeRidgeExtractorTest( int argc, char * argv[] )
   double intensity;
   double roundness;
   double curvature;
-  double linearity;
+  double levelness;
   unsigned int skip = 0;
   itk::ImageRegionIteratorWithIndex<ImageType> itOut( imOut,
     imOut->GetLargestPossibleRegion() );
@@ -107,105 +106,76 @@ int itktubeRidgeExtractorTest( int argc, char * argv[] )
   itOut.GoToBegin();
   ImageType::IndexType startIndx = itOut.GetIndex();
   std::cout << "Start..." << std::endl;
-  bool firstSearch = false;
-  int prev2 = -1;
   while( !itOut.IsAtEnd() )
     {
     contIndx = itOut.GetIndex();
-    if( ((int)(( itOut.GetIndex()[2] - startIndx[2] ) / 2 )) >= 6 )
+    int taskHash = (int)(( contIndx[2] - startIndx[2] ) / 2 );
+    if( taskHash > 5 )
       {
-      break;
+      if( taskHash > 6 )
+        {
+        break;
+        }
+      taskHash = 5;
       }
-    switch( ((int)(( itOut.GetIndex()[2] - startIndx[2] ) / 2 )) % 6 )
+    switch( taskHash )
       {
       default:
       case 0:
         {
-        if( prev2 != itOut.GetIndex()[2] )
-          {
-          std::cout << "Intensity: " << contIndx << std::endl;
-          prev2 = itOut.GetIndex()[2];
-          }
         itOut.Set( ridgeOp->Intensity( itOut.GetIndex() ) );
-        firstSearch = true;
         break;
         }
       case 1:
         {
-        if( prev2 != itOut.GetIndex()[2] )
-          {
-          std::cout << "Ridgeness: " << contIndx << std::endl;
-          prev2 = itOut.GetIndex()[2];
-          }
         itOut.Set( ridgeOp->Ridgeness( contIndx, intensity, roundness,
-          curvature, linearity ) );
-        firstSearch = true;
+          curvature, levelness ) );
         break;
         }
       case 2:
         {
-        if( prev2 != itOut.GetIndex()[2] )
-          {
-          std::cout << "Roundness: " << contIndx << std::endl;
-          prev2 = itOut.GetIndex()[2];
-          }
         ridgeOp->Ridgeness( contIndx, intensity, roundness,
-          curvature, linearity );
+          curvature, levelness );
         itOut.Set( roundness );
-        firstSearch = true;
         break;
         }
       case 3:
         {
-        if( prev2 != itOut.GetIndex()[2] )
-          {
-          std::cout << "Curvature: " << contIndx << std::endl;
-          prev2 = itOut.GetIndex()[2];
-          }
         ridgeOp->Ridgeness( contIndx, intensity, roundness,
-          curvature, linearity );
+          curvature, levelness );
         itOut.Set( curvature );
-        firstSearch = true;
         break;
         }
       case 4:
         {
-        if( prev2 != itOut.GetIndex()[2] )
-          {
-          std::cout << "Linearity: " << contIndx << std::endl;
-          prev2 = itOut.GetIndex()[2];
-          }
         ridgeOp->Ridgeness( contIndx,  intensity,roundness,
-          curvature, linearity );
-        itOut.Set( linearity );
-        firstSearch = true;
+          curvature, levelness );
+        itOut.Set( levelness );
         break;
         }
       case 5:
         {
-        if( firstSearch )
-          {
-          skip = (int)(contIndx[1]-startIndx[1])%4 * 3;
-          firstSearch = false;
-          }
-        if( ++skip > 47 )
+        if( ++skip > 37 )
           {
           skip = 0;
           std::cout << "Local ridge: " << contIndx << std::endl;
           contIndx[1] = size[1]/2;
-          if( ridgeOp->LocalRidge( contIndx ) )
+          if( ridgeOp->LocalRidge( contIndx ) == RidgeOpType::SUCCESS )
             {
             std::cout << "   leads to: " << contIndx << std::endl;
             for( unsigned int i=0; i<3; i++ )
               {
               indx[i] = contIndx[i];
               }
-            if( vnl_math_abs( indx[2] - itOut.GetIndex()[2] ) < 2 )
-              {
-              indx[2] = itOut.GetIndex()[2];
-              int v = imOut->GetPixel( indx );
-              imOut->SetPixel( indx, v+1 );
-              }
+            imOut->SetPixel( indx, imOut->GetPixel( indx ) + 1 );
+            std::cout << "      ridgeness = " <<
+              ridgeOp->GetCurrentRidgeness() << std::endl;
+            std::cout << "      roundness = " <<
+              ridgeOp->GetCurrentRoundness() << std::endl;
+            std::cout << "      curvature = " <<
+              ridgeOp->GetCurrentCurvature() << std::endl;
+            std::cout << "      levelness = " <<
+              ridgeOp->GetCurrentLevelness() << std::endl;
             }
           }
         break;
@@ -223,4 +193,4 @@ int itktubeRidgeExtractorTest( int argc, char * argv[] )
   imWriter->Update();
 
   return EXIT_SUCCESS;
-  }
+}

@@ -24,7 +24,6 @@ limitations under the License.
 #include "tubeMessage.h"
 
 #include <itkDanielssonDistanceMapImageFilter.h>
-#include <itkImageToVectorImageFilter.h>
 #include <itkImageFileReader.h>
 #include <itkImageFileWriter.h>
 
@@ -245,15 +244,6 @@ int DoIt( int argc, char **argv )
 
   typedef itk::ImageFileReader< InputImageType >          InputReaderType;
   typedef itk::ImageFileWriter< OutputImageType >         OutputWriterType;
-
-  typedef itk::ImageIOBase::IOComponentType               ScalarPixelType;
-
-  typedef itk::VectorImage< InputPixelType,
-                            VImageDimension >             VectorImageType;
-
-  typedef itk::ImageToVectorImageFilter< InputImageType>  ImageStackFilterType;
-
-  typedef itk::ImageFileWriter< VectorImageType >         VectorImageWriterType;
 
   typedef itk::ImageRegionIteratorWithIndex< InputImageType >
                                                           ImageIteratorType;
